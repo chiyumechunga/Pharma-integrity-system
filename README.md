@@ -2,7 +2,7 @@
 
 ## Abstract
 
-This repository presents a blockchain-based pharmaceutical integrity system developed as an undergraduate capstone project at Mulungushi University. The system addresses critical vulnerabilities in pharmaceutical supply chains within developing nations, with specific focus on Zambia's healthcare infrastructure. By leveraging **Hyperledger FireFly** with **Hyperledger Fabric chaincode**, this implementation demonstrates a practical application of blockchain solutions to combat pharmaceutical counterfeiting and enhance supply chain transparency using event-driven dual writes [file:1][web:2][web:5].
+This repository presents a blockchain-based pharmaceutical integrity system developed as an undergraduate capstone project at Mulungushi University. The system addresses critical vulnerabilities in pharmaceutical supply chains within developing nations, with specific focus on Zambia's healthcare infrastructure. By leveraging **Hyperledger FireFly** with **Hyperledger Fabric chaincode**, this implementation demonstrates a practical application of blockchain solutions to combat pharmaceutical counterfeiting and enhance supply chain transparency.
 
 ## Problem Statement
 
