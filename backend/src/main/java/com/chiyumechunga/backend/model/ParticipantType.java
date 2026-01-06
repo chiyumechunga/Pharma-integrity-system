@@ -5,6 +5,5 @@ public enum ParticipantType {
     MANUFACTURER,
     DISTRIBUTOR,
     HEALTH_FACILITY,
-    PHARMACY,
-    LOGISTICS
+    PHARMACY
 }

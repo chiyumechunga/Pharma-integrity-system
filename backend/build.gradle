@@ -1,6 +1,6 @@
 plugins {
     id 'java'
-    id 'org.springframework.boot' version '3.5.9'
+    id 'org.springframework.boot' version '3.5.9' // Latest 3.x stable release as of Dec 2025
     id 'io.spring.dependency-management' version '1.1.7'
     id 'org.asciidoctor.jvm.convert' version '4.0.5'
 }
@@ -30,26 +30,30 @@ ext {
 }
 
 dependencies {
+    // --- Spring Boot Starters ---
     implementation 'org.springframework.boot:spring-boot-starter-data-jpa'
     implementation 'org.springframework.boot:spring-boot-starter-security'
     implementation 'org.springframework.boot:spring-boot-starter-web'
     implementation 'org.springframework.boot:spring-boot-starter-webflux'
-    // Jakarta Validation API (jakarta.validation.* package)
-    implementation 'jakarta.validation:jakarta.validation-api:3.0.0' // Use the latest version from Maven Repository
 
-    // Bean Validation provider (Hibernate Validator is the reference implementation)
-    implementation 'org.hibernate.validator:hibernate-validator:6.0.24.Final' // Check Maven Repository for compatible version
+    // Replaces manual Jakarta/Hibernate Validator dependencies
+    implementation 'org.springframework.boot:spring-boot-starter-validation'
 
-    // If using Spring Boot 3+, use the spring-boot-starter-validation
-    // implementation 'org.springframework.boot:spring-boot-starter-validation' // Manages both API and provider versions automatically
+    // --- Third Party ---
+    implementation 'org.springdoc:springdoc-openapi-starter-webmvc-ui:3.0.1'
+    implementation 'org.apache.commons:commons-lang3:3.20.0' // Updated to latest stable
+
+    // --- Tooling & Drivers ---
     compileOnly 'org.projectlombok:lombok'
-    developmentOnly 'org.springframework.boot:spring-boot-devtools'
-    runtimeOnly 'org.postgresql:postgresql'
     annotationProcessor 'org.projectlombok:lombok'
+    developmentOnly 'org.springframework.boot:spring-boot-devtools'
+    runtimeOnly 'org.postgresql:postgresql' // Version managed by Spring Boot
+
+    // --- Testing ---
+    // Includes JUnit 5, Mockito, AssertJ, etc.
     testImplementation 'org.springframework.boot:spring-boot-starter-test'
-    testImplementation 'org.springframework.restdocs:spring-restdocs-mockmvc'
     testImplementation 'org.springframework.security:spring-security-test'
-    testRuntimeOnly 'org.junit.platform:junit-platform-launcher'
+    testImplementation 'org.springframework.restdocs:spring-restdocs-mockmvc'
 }
 
 tasks.named('test') {

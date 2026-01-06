@@ -17,8 +17,8 @@ public class FireflyConfig {
     private String namespace;
 
     @Bean
-    public WebClient fireflyWebClient() {
-        return WebClient.builder()
+    public WebClient fireflyWebClient(WebClient.Builder builder) {
+        return builder
                 .baseUrl(fireflyUrl + "/namespaces/" + namespace)
                 .defaultHeader(HttpHeaders.CONTENT_TYPE, MediaType.APPLICATION_JSON_VALUE)
                 .build();

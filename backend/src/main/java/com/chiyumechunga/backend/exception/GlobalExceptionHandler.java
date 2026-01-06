@@ -3,12 +3,15 @@ package com.chiyumechunga.backend.exception;
 import com.chiyumechunga.backend.dto.ErrorResponseDto;
 import jakarta.servlet.http.HttpServletRequest;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
+import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.validation.FieldError;
 import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
+import org.springframework.web.util.HtmlUtils;
 
 import java.time.LocalDateTime;
 import java.util.HashMap;
@@ -20,35 +23,38 @@ public class GlobalExceptionHandler {
 
     /**
      * Handle Validation Errors (e.g., @NotBlank, @Future violations)
-     * Returns HTTP 400 (Bad Request)
+     * Securely sanitizes the output to prevent Reflected XSS.
      */
     @ExceptionHandler(MethodArgumentNotValidException.class)
     public ResponseEntity<ErrorResponseDto> handleValidationErrors(
             MethodArgumentNotValidException ex, HttpServletRequest request) {
 
-        // Extract specific field errors (e.g., "productName": "must not be blank")
+        // 1. Sanitize Validation Messages
+        // The error message might contain the bad input, so we escape it.
         Map<String, String> errors = new HashMap<>();
         for (FieldError error : ex.getBindingResult().getFieldErrors()) {
-            errors.put(error.getField(), error.getDefaultMessage());
+            String safeField = HtmlUtils.htmlEscape(error.getField());
+            String safeMessage = HtmlUtils.htmlEscape(error.getDefaultMessage());
+            errors.put(safeField, safeMessage);
         }
 
         log.warn("Validation failed for request to {}", request.getRequestURI());
 
+        // 2. Create Response with Sanitized Path
         ErrorResponseDto response = new ErrorResponseDto(
                 LocalDateTime.now(),
                 HttpStatus.BAD_REQUEST.value(),
                 "Validation Failed",
                 "Input data contains errors",
-                request.getRequestURI(),
+                HtmlUtils.htmlEscape(request.getRequestURI()), // <--- FIX: Sanitize the Path
                 errors
         );
 
-        return new ResponseEntity<>(response, HttpStatus.BAD_REQUEST);
+        return buildResponse(response, HttpStatus.BAD_REQUEST);
     }
 
     /**
-     * Handle Resource Not Found (e.g., Scanning a QR that doesn't exist)
-     * Returns HTTP 404 (Not Found)
+     * Handle Resource Not Found
      */
     @ExceptionHandler(ResourceNotFoundException.class)
     public ResponseEntity<ErrorResponseDto> handleResourceNotFound(
@@ -60,17 +66,16 @@ public class GlobalExceptionHandler {
                 LocalDateTime.now(),
                 HttpStatus.NOT_FOUND.value(),
                 "Not Found",
-                ex.getMessage(),
-                request.getRequestURI(),
+                HtmlUtils.htmlEscape(ex.getMessage()), // Sanitize the message just in case
+                HtmlUtils.htmlEscape(request.getRequestURI()), // <--- FIX: Sanitize the Path
                 null
         );
 
-        return new ResponseEntity<>(response, HttpStatus.NOT_FOUND);
+        return buildResponse(response, HttpStatus.NOT_FOUND);
     }
 
     /**
      * Handle Generic/Unexpected Errors
-     * Returns HTTP 500 (Internal Server Error)
      */
     @ExceptionHandler(Exception.class)
     public ResponseEntity<ErrorResponseDto> handleGlobalException(
@@ -83,10 +88,21 @@ public class GlobalExceptionHandler {
                 HttpStatus.INTERNAL_SERVER_ERROR.value(),
                 "Internal Server Error",
                 "An unexpected error occurred. Please contact support.",
-                request.getRequestURI(),
+                HtmlUtils.htmlEscape(request.getRequestURI()), // <--- FIX: Sanitize the Path
                 null
         );
 
-        return new ResponseEntity<>(response, HttpStatus.INTERNAL_SERVER_ERROR);
+        return buildResponse(response, HttpStatus.INTERNAL_SERVER_ERROR);
+    }
+
+    /**
+     * Helper to add Security Headers to all Error Responses
+     */
+    private ResponseEntity<ErrorResponseDto> buildResponse(ErrorResponseDto body, HttpStatus status) {
+        HttpHeaders headers = new HttpHeaders();
+        headers.add("X-Content-Type-Options", "nosniff");
+        headers.setContentType(MediaType.APPLICATION_JSON);
+
+        return new ResponseEntity<>(body, headers, status);
     }
 }

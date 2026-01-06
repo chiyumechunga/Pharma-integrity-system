@@ -4,10 +4,9 @@ import com.chiyumechunga.backend.dto.RegistryRequestDto;
 
 public interface FireflyIntegrationService {
     /**
-     * Sends a contract invocation to Hyperledger Firefly.
-     * @param method The name of the function in Chaincode (e.g., "CreateAsset")
-     * @param request The data payload
-     * @return The Operation ID from Firefly
+     * Invokes a smart contract function.
+     * @param functionName The name of the function in your Chaincode (e.g., "CreateAsset").
+     * @param payload The data DTO (RegistryRequestDto, LabInspectionRequestDto, etc.).
      */
-    String invokeContract(String method, RegistryRequestDto request);
+    String invokeContract(String functionName, Object payload); // <--- Changed to Object
 }
