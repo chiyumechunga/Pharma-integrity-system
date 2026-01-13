@@ -1,4 +1,8 @@
 package com.chiyumechunga.backend.service;
 
-public class AuthService {
+import com.chiyumechunga.backend.dto.auth.AuthResponseDto;
+import com.chiyumechunga.backend.dto.auth.LoginRequestDto;
+
+public interface AuthService {
+    AuthResponseDto login(LoginRequestDto request);
 }

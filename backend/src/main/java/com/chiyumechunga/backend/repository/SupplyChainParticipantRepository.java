@@ -10,4 +10,6 @@ import java.util.UUID;
 public interface SupplyChainParticipantRepository extends JpaRepository<SupplyChainParticipant, UUID> {
     Optional<SupplyChainParticipant> findByParticipantCode(String participantCode);
     boolean existsByParticipantCode(String participantCode);
+    Optional<SupplyChainParticipant> findByEmail(String email);
+
 }

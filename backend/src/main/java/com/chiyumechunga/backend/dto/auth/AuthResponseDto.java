@@ -1,4 +1,8 @@
 package com.chiyumechunga.backend.dto.auth;
 
-public class AuthResponseDto {
-}
+public record AuthResponseDto(
+        String token,
+        String type,        // "Bearer"
+        String userId,
+        String role         // "MANUFACTURER", "INSPECTOR", "PHARMACY"
+) {}

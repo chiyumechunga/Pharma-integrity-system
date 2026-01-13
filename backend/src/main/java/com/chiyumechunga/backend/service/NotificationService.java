@@ -1,4 +1,5 @@
 package com.chiyumechunga.backend.service;
 
-public class NotificationService {
+public interface NotificationService {
+    void sendAdminAlert(String message, String urgency);
 }

@@ -1,18 +1,16 @@
 package com.chiyumechunga.backend.model;
 
 import jakarta.persistence.*;
+import lombok.AllArgsConstructor;
 import lombok.Data;
 import lombok.NoArgsConstructor;
-import lombok.AllArgsConstructor;
-import org.hibernate.annotations.CreationTimestamp;
-import java.time.LocalDateTime;
 import java.util.UUID;
 
-@Entity
-@Table(name = "supply_chain_participants")
 @Data
 @NoArgsConstructor
 @AllArgsConstructor
+@Entity
+@Table(name = "supply_chain_participants")
 public class SupplyChainParticipant {
 
     @Id
@@ -21,22 +19,27 @@ public class SupplyChainParticipant {
     private UUID participantId;
 
     @Column(name = "participant_code", unique = true, nullable = false)
-    private String participantCode; // e.g., 'ZAMRA-001'
+    private String participantCode;
 
     @Column(name = "participant_name", nullable = false)
     private String participantName;
 
+    // FIX FOR 'setRole' ERROR: Field name must match the setter (setRole -> role)
     @Enumerated(EnumType.STRING)
     @Column(name = "participant_type", nullable = false)
-    private ParticipantType participantType;
+    private ParticipantType role;
 
-    @Column(name = "country")
     private String country;
 
     @Column(name = "blockchain_enrollment_id")
-    private String blockchainEnrollmentId; // The Fabric/Ethereum Wallet Address
+    private String blockchainEnrollmentId;
 
-    @CreationTimestamp
-    @Column(name = "created_at", updatable = false)
-    private LocalDateTime createdAt;
+    // === FIX FOR 'setPassword', 'setActive', 'findByEmail' ERRORS ===
+    @Column(unique = true)
+    private String email;
+
+    private String password;
+
+    @Column(name = "is_active")
+    private boolean isActive = true;
 }

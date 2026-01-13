@@ -25,46 +25,52 @@ public class FireflyWebhookController {
     }
 
     /**
-     * EVENT DRIVEN UPDATE:
-     * Firefly → Webhook → Postgres
-     * * Logic applied:
-     * 1. Filtering: Ignore system events (pings, blocks) that aren't asset creations.
-     * 2. Null Safety: Prevent NullPointerExceptions on empty payloads.
-     * 3. Reliability: Return 500 on failure to trigger Firefly's "Reliable Delivery" (Retry).
+     * UNIVERSAL EVENT RECEIVER:
+     * Handles ALL Blockchain events:
+     * 1. CreateAsset (Registry)
+     * 2. TransferCustody (Supply Chain)
+     * 3. SubmitTestResult (Regulatory)
+     *
+     * Firefly Subscription should point to: POST /api/v1/webhooks/firefly
      */
-    @PostMapping("/assets")
-    public ResponseEntity<Void> handleAssetEvent(@RequestBody FireflyEventDto event) {
-        log.info("Received Event from Firefly: Type={}, ID={}", event.type(), event.id());
+    @PostMapping // <--- CHANGED: Removed "/assets" to make it the default handler for this path
+    public ResponseEntity<Void> handleBlockchainEvent(@RequestBody FireflyEventDto event) {
+        log.info("🔔 Webhook Triggered | Type: {} | ID: {}", event.type(), event.id());
 
         // 1. FILTERING: Only process explicit blockchain events
-        // If Firefly sends a "message_confirmed" or internal event, we ignore it safely.
         if (!EVENT_TYPE_BLOCKCHAIN.equals(event.type())) {
-            log.debug("Skipping irrelevant event type: {}", event.type());
-            return ResponseEntity.ok().build(); // Return 200 so Firefly considers it "delivered"
+            log.debug("Skipping non-blockchain event (Ping/System): {}", event.type());
+            return ResponseEntity.ok().build();
         }
 
         // 2. NULL SAFETY: Validation check
         if (event.output() == null || event.output().data() == null) {
-            log.warn("Received blockchain event with empty data payload. ID: {}", event.id());
-            return ResponseEntity.ok().build(); // Return 200 to discard bad data
+            log.warn("⚠️ Ignored Empty Payload Event ID: {}", event.id());
+            return ResponseEntity.ok().build();
         }
 
-        // 3. PROCESSING WITH RETRY LOGIC
+        // 3. IDENTIFY SUB-TYPE (For Debugging)
+        // Firefly sends the "data" map. We can peek at it to see what kind of event it is.
+        // (The Service handles the actual logic, but logging it here helps you debug)
+        String qrHash = event.output().data().qrHash();
+        log.info("Processing Event for Product QR: {}", qrHash);
+
+        // 4. PROCESSING WITH RETRY LOGIC (Synchronous)
         try {
-            // We run this SYNCHRONOUSLY.
-            // Why? If we used @Async, we would return 200 OK immediately.
-            // If the DB write failed 1ms later, the event would be lost forever.
-            // By blocking here, if the DB fails, we catch the error and return 500.
+            // This service method is the "Switchboard" that decides:
+            // "Is this a new asset? Save to Registry."
+            // "Is this a transfer? Update ChainOfCustody."
             eventProcessingService.processBlockchainEvent(event);
 
-            log.info("Successfully processed event ID: {}", event.id());
+            log.info("✅ Event Processed Successfully: {}", event.id());
             return ResponseEntity.ok().build();
 
         } catch (Exception e) {
-            log.error("Failed to process Firefly event. Triggering RETRY mechanism.", e);
+            log.error("❌ CRITICAL: Failed to process Firefly event {}. Triggering RETRY.", event.id(), e);
 
-            // 4. RELIABILITY: Return 500 Internal Server Error
-            // This tells Firefly: "I failed to save this. Please send it again later."
+            // 5. RELIABILITY: Return 500 Internal Server Error
+            // Firefly will detect this 500 and automatically retry sending the event
+            // according to its "Reliable Delivery" policy (usually exponential backoff).
             return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).build();
         }
     }

@@ -17,9 +17,12 @@ public class RegulatoryScrutiny {
     @Column(name = "scrutiny_id")
     private UUID scrutinyId;
 
-    @ManyToOne
+    // --- DUPLICATE MAPPING FIX ---
+    // Removed 'private PharmaceuticalRegistry product;' to avoid crash.
+    // We keep 'registry' because it matches the Service logic.
+    @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "registry_id", nullable = false)
-    private PharmaceuticalRegistry product;
+    private PharmaceuticalRegistry registry;
 
     @ManyToOne
     @JoinColumn(name = "inspector_id")
@@ -36,5 +39,5 @@ public class RegulatoryScrutiny {
     private LocalDate scrutinyDate;
 
     @Column(name = "blockchain_tx_id")
-    private String blockchainTxId; // Proof that ZAMRA verified this
+    private String blockchainTxId;
 }

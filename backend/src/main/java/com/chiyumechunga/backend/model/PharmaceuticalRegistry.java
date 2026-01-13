@@ -30,14 +30,18 @@ public class PharmaceuticalRegistry {
     @Column(name = "batch_number")
     private String batchNumber;
 
-    @Column(name = "manufacturer_id")
-    private UUID manufacturerId;
+    // --- RELATIONSHIP FIX ---
+    // Was: private UUID manufacturerId;
+    // Now: Links to the Participant object so Hibernate can join tables
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "manufacturer_id")
+    private SupplyChainParticipant manufacturer;
 
     @Column(name = "expiry_date")
     private LocalDate expiryDate;
 
     @Column(name = "current_status")
-    private String currentStatus; // PENDING, ON_CHAIN
+    private String currentStatus;
 
     @Column(name = "blockchain_tx_id")
     private String blockchainTxId;
