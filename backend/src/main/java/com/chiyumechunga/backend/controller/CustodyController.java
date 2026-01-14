@@ -1,7 +1,7 @@
 package com.chiyumechunga.backend.controller;
 
+import com.chiyumechunga.backend.dto.CustodyTransferRequestDto; // <--- FIX 1: Correct Import
 import com.chiyumechunga.backend.dto.FireflyAckDto;
-import com.chiyumechunga.backend.dto.TransferRequestDto;
 import com.chiyumechunga.backend.service.CustodyService;
 import jakarta.validation.Valid;
 import lombok.extern.slf4j.Slf4j;
@@ -21,23 +21,24 @@ public class CustodyController {
 
     private final CustodyService custodyService;
 
-    // Constructor Injection (Best Practice)
     public CustodyController(CustodyService custodyService) {
         this.custodyService = custodyService;
     }
 
     /**
      * Endpoint for Distributors/Pharmacies to accept custody of a product.
-     * * @param request Contains QR Hash, Sender ID, Receiver ID, and Event Type.
+     * @param request Contains Batch Number, Sender ID, Receiver ID.
      * @return Acknowledgment from Blockchain (Operation ID).
      */
     @PostMapping("/transfer")
-    public ResponseEntity<FireflyAckDto> transferProduct(@Valid @RequestBody TransferRequestDto request) {
-        log.info("Received Custody Transfer Request | QR: {} | From: {} | To: {}",
-                request.qrHash(), request.fromParticipantId(), request.toParticipantId());
+    // FIX 2: Update parameter type to 'CustodyTransferRequestDto'
+    public ResponseEntity<FireflyAckDto> transferProduct(@Valid @RequestBody CustodyTransferRequestDto request) {
+
+        // FIX 3: Use 'batchNumber()' instead of 'qrHash()' (matching the DTO)
+        log.info("Received Custody Transfer Request | Batch: {} | From: {} | To: {}",
+                request.batchNumber(), request.fromParticipantId(), request.toParticipantId());
 
         // 1. CALL SERVICE
-        // This triggers the blockchain transaction via Firefly
         FireflyAckDto response = custodyService.transferCustody(request);
 
         // 2. SECURITY HEADERS
@@ -45,9 +46,7 @@ public class CustodyController {
         headers.add("X-Content-Type-Options", "nosniff");
         headers.setContentType(MediaType.APPLICATION_JSON);
 
-        // 3. RETURN RESPONSE
-        // We use HttpStatus.ACCEPTED (202) because blockchain transactions are asynchronous.
-        // The request is "Accepted" for processing, but not yet "Confirmed" on-chain.
+        // 3. RETURN RESPONSE (202 Accepted)
         return new ResponseEntity<>(response, headers, HttpStatus.ACCEPTED);
     }
 }

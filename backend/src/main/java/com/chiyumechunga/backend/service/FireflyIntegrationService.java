@@ -1,12 +1,14 @@
 package com.chiyumechunga.backend.service;
 
-import com.chiyumechunga.backend.dto.RegistryRequestDto;
+import com.chiyumechunga.backend.model.ParticipantType;
 
 public interface FireflyIntegrationService {
     /**
-     * Invokes a smart contract function.
-     * @param functionName The name of the function in your Chaincode (e.g., "CreateAsset").
-     * @param payload The data DTO (RegistryRequestDto, LabInspectionRequestDto, etc.).
+     * Invokes a smart contract function on the blockchain.
+     * @param functionName The name of the function (e.g., "CreateAsset")
+     * @param payload The DTO containing the data
+     * @param role The role of the user invoking it (Determines which Node is used)
+     * @return The Operation ID from Firefly
      */
-    String invokeContract(String functionName, Object payload); // <--- Changed to Object
+    String invokeContract(String functionName, Object payload, ParticipantType role);
 }

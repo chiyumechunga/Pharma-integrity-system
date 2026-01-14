@@ -24,18 +24,24 @@ public class PharmaceuticalRegistry {
     @Column(name = "qr_hash", unique = true, nullable = false)
     private String qrHash;
 
+    // --- NEW: LINK TO PRODUCT MASTER ---
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "product_id")
+    private ProductMaster product;
+
+    // We keep product_name as a cache/snapshot, or remove it if you prefer strict normalization
     @Column(name = "product_name")
     private String productName;
 
     @Column(name = "batch_number")
     private String batchNumber;
 
-    // --- RELATIONSHIP FIX ---
-    // Was: private UUID manufacturerId;
-    // Now: Links to the Participant object so Hibernate can join tables
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "manufacturer_id")
     private SupplyChainParticipant manufacturer;
+
+    @Column(name = "manufacturing_date")
+    private LocalDate manufacturingDate;
 
     @Column(name = "expiry_date")
     private LocalDate expiryDate;
@@ -52,4 +58,7 @@ public class PharmaceuticalRegistry {
     @CreationTimestamp
     @Column(name = "created_at", updatable = false)
     private LocalDateTime createdAt;
+
+    @Column(name = "confirmed_at")
+    private LocalDateTime confirmedAt;
 }

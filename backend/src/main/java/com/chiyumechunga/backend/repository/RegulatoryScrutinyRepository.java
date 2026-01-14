@@ -16,12 +16,10 @@ public interface RegulatoryScrutinyRepository extends JpaRepository<RegulatorySc
 
     // 2. MANUFACTURER QUALITY STATS (Using Hibernate JPQL)
     // "Navigate from Scrutiny to Manufacturer Name"
-    @Query("SELECT r.registry.manufacturer.participantName, " +
-            "       COUNT(r), " +
-            "       SUM(CASE WHEN r.testResult = 'FAILED' THEN 1 ELSE 0 END) " +
-            "FROM RegulatoryScrutiny r " +
-            "GROUP BY r.registry.manufacturer.participantName")
 
-
+    // Fixes "Cannot resolve method getFailureRatesByManufacturer"
+    @Query("SELECT r.registry.manufacturer.participantName, COUNT(r), SUM(CASE WHEN r.testResult = 'FAILED' THEN 1 ELSE 0 END) FROM RegulatoryScrutiny r GROUP BY r.registry.manufacturer.participantName")
     List<Object[]> getFailureRatesByManufacturer();
+
+
 }

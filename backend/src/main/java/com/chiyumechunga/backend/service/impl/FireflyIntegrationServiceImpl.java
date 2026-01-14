@@ -1,6 +1,8 @@
 package com.chiyumechunga.backend.service.impl;
 
+import com.chiyumechunga.backend.config.FireflyNodeRouter;
 import com.chiyumechunga.backend.dto.firefly.FireflyContractInvokeDto;
+import com.chiyumechunga.backend.model.ParticipantType;
 import com.chiyumechunga.backend.service.FireflyIntegrationService;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.extern.slf4j.Slf4j;
@@ -13,36 +15,42 @@ import java.util.Map;
 @Service
 public class FireflyIntegrationServiceImpl implements FireflyIntegrationService {
 
-    private final WebClient fireflyWebClient;
-    private final ObjectMapper objectMapper; // Helper to convert DTOs to Map
+    // REPLACED: private final WebClient fireflyWebClient;
+    private final FireflyNodeRouter nodeRouter; // <--- The new dynamic router
+    private final ObjectMapper objectMapper;
 
-    public FireflyIntegrationServiceImpl(WebClient fireflyWebClient, ObjectMapper objectMapper) {
-        this.fireflyWebClient = fireflyWebClient;
+    public FireflyIntegrationServiceImpl(FireflyNodeRouter nodeRouter, ObjectMapper objectMapper) {
+        this.nodeRouter = nodeRouter;
         this.objectMapper = objectMapper;
     }
 
+    /**
+     * Now accepts 'currentUserRole' to determine WHICH node to talk to.
+     */
     @Override
-    public String invokeContract(String functionName, Object payload) { // <--- Changed to Object
-        log.info("Invoking Contract Function: {}", functionName);
+    public String invokeContract(String functionName, Object payload, ParticipantType currentUserRole) {
+        log.info("Invoking Contract Function: '{}' as Role: {}", functionName, currentUserRole);
 
-        // 1. Convert any DTO to a Map (JSON structure)
-        // This works for RegistryRequestDto, LabInspectionRequestDto, etc.
+        // 1. SELECT THE CORRECT NODE
+        // If role is MANUFACTURER -> Uses http://localhost:7000
+        // If role is ZAMMSA       -> Uses http://localhost:7001
+        WebClient client = nodeRouter.getClientForRole(currentUserRole);
+
+        // 2. PREPARE DATA
         Map<String, Object> inputData = objectMapper.convertValue(payload, Map.class);
 
-        // 2. Build the Firefly Payload
         FireflyContractInvokeDto requestBody = new FireflyContractInvokeDto(
                 new FireflyContractInvokeDto.Location("pharma-integrity-contract"),
                 new FireflyContractInvokeDto.Method(functionName),
                 inputData
         );
 
-        // 3. Send to Firefly Node
-        // (Assuming synchronous for simplicity, though async is usually better for blockchain)
-        return fireflyWebClient.post()
+        // 3. SEND REQUEST (To the specific node selected above)
+        return client.post()
                 .uri("/contracts/invoke")
                 .bodyValue(requestBody)
                 .retrieve()
-                .bodyToMono(String.class) // Returns the Operation ID
+                .bodyToMono(String.class)
                 .block();
     }
 }

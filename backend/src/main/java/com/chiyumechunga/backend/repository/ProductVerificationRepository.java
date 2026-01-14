@@ -13,16 +13,12 @@ public interface ProductVerificationRepository extends JpaRepository<ProductVeri
 
     long countByIsValidTrue();
     long countByIsValidFalse();
-    // 1. Matches your String schema (instead of boolean)
-    long countByVerificationStatus(String verificationStatus);
 
-    // 2. DETECT CLONES (Using Hibernate JPQL)
-    // "Select the QR Hash from the Registry object inside Verification..."
-    @Query("SELECT v.pharmaceuticalRegistry.qrHash, COUNT(v) " +
-            "FROM ProductVerification v " +
-            "GROUP BY v.pharmaceuticalRegistry.qrHash " +
-            "HAVING COUNT(v) > 10")
+    // Fixes "Cannot resolve method countByIsValid..."
+    // NOTE: We switched to String status in the schema, so we use this:
+    long countByVerificationStatus(String status);
 
-
+    // Fixes "Cannot resolve method findPotentialClones"
+    @Query("SELECT v.pharmaceuticalRegistry.qrHash, COUNT(v) FROM ProductVerification v GROUP BY v.pharmaceuticalRegistry.qrHash HAVING COUNT(v) > 10")
     List<Object[]> findPotentialClones();
 }

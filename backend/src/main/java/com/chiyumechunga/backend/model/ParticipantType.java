@@ -1,9 +1,8 @@
 package com.chiyumechunga.backend.model;
 
 public enum ParticipantType {
-    REGULATOR,
+    ZAMRA,          // Was REGULATOR
     MANUFACTURER,
-    DISTRIBUTOR,
-    HEALTH_FACILITY,
+    ZAMMSA,         // Was DISTRIBUTOR
     PHARMACY
 }

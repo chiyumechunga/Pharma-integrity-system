@@ -1,8 +1,9 @@
 package com.chiyumechunga.backend.service;
 
+import com.chiyumechunga.backend.dto.CustodyTransferRequestDto; // <--- UPDATE THIS IMPORT
 import com.chiyumechunga.backend.dto.FireflyAckDto;
-import com.chiyumechunga.backend.dto.TransferRequestDto;
 
 public interface CustodyService {
-    FireflyAckDto transferCustody(TransferRequestDto request);
+    // Update the parameter type to match the DTO class we created
+    FireflyAckDto transferCustody(CustodyTransferRequestDto request);
 }
