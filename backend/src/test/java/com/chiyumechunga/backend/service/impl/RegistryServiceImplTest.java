@@ -1,9 +1,8 @@
-package com.chiyumechunga.backend.mytests;
+package com.chiyumechunga.backend.service;
 
 import com.chiyumechunga.backend.dto.FireflyAckDto;
 import com.chiyumechunga.backend.dto.RegistryRequestDto;
-import com.chiyumechunga.backend.model.ParticipantType; // <--- Import this
-import com.chiyumechunga.backend.service.FireflyIntegrationService;
+import com.chiyumechunga.backend.model.ParticipantType;
 import com.chiyumechunga.backend.service.impl.RegistryServiceImpl;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
@@ -16,9 +15,8 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import java.time.LocalDate;
 import java.util.UUID;
 
-import static javax.management.Query.eq;
-import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.eq;
 
 @ExtendWith(MockitoExtension.class)
 class RegistryServiceImplTest {
@@ -31,32 +29,37 @@ class RegistryServiceImplTest {
 
     @Test
     void shouldRegisterBatchSuccessfully() {
-        // 1. SETUP
+        // 1. SETUP: Create valid test data
         UUID mfgId = UUID.randomUUID();
         RegistryRequestDto request = new RegistryRequestDto(
-                "Panadol", "BATCH-001", mfgId, LocalDate.now().plusYears(1), "abc123hash"
+                "Panadol",
+                "BATCH-001",
+                mfgId,
+                LocalDate.now().plusYears(1),
+                "abc123hash"
         );
 
-        // 2. MOCK (The Fix: Added the 3rd argument matcher)
+        // 2. MOCK: Simulate the Firefly Service response
+        // CRITICAL: We must match the 3 arguments (String, Object, Role)
         Mockito.when(fireflyService.invokeContract(
-                eq("CreateAsset"),
-                any(),
-                eq(ParticipantType.MANUFACTURER) // <--- CRITICAL FIX
+                eq("CreateAsset"),           // 1. Function Name
+                any(RegistryRequestDto.class), // 2. Payload
+                eq(ParticipantType.MANUFACTURER) // 3. Role (The routing fix)
         )).thenReturn("ff-operation-123");
 
-        // 3. EXECUTE
+        // 3. EXECUTE: Call the actual service method
         FireflyAckDto result = registryService.registerBatch(request);
 
-        // 4. VERIFY
+        // 4. VERIFY: Check the results
         Assertions.assertEquals("SUBMITTED", result.status());
         Assertions.assertEquals("ff-operation-123", result.operationId());
 
-        // Verify the call happened with the correct role
+        // Verify the mock was called exactly once with the correct parameters
         Mockito.verify(fireflyService, Mockito.times(1))
                 .invokeContract(
                         eq("CreateAsset"),
                         eq(request),
-                        eq(ParticipantType.MANUFACTURER) // <--- CRITICAL FIX
+                        eq(ParticipantType.MANUFACTURER)
                 );
     }
 }
