@@ -1,9 +1,9 @@
-package com.chiyumechunga.backend.service;
+package com.chiyumechunga.backend.service.impl;
 
 import com.chiyumechunga.backend.dto.FireflyAckDto;
 import com.chiyumechunga.backend.dto.RegistryRequestDto;
 import com.chiyumechunga.backend.model.ParticipantType;
-import com.chiyumechunga.backend.service.impl.RegistryServiceImpl;
+import com.chiyumechunga.backend.service.FireflyIntegrationService;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;

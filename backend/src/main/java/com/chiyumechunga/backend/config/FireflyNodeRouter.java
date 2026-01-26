@@ -16,6 +16,19 @@ public class FireflyNodeRouter {
     @Value("${firefly.namespace}")
     private String namespace;
 
+    // --- Injecting Node URLs from application.properties ---
+    @Value("${firefly.nodes.manufacturer}")
+    private String manufacturerNodeUrl;
+
+    @Value("${firefly.nodes.zammsa}")
+    private String zammsaNodeUrl;
+
+    @Value("${firefly.nodes.pharmacy}")
+    private String pharmacyNodeUrl;
+
+    @Value("${firefly.nodes.zamra}")
+    private String zamraNodeUrl;
+
     // Cache clients so we don't rebuild them every request
     private final Map<ParticipantType, WebClient> nodeClients = new ConcurrentHashMap<>();
 
@@ -29,19 +42,19 @@ public class FireflyNodeRouter {
     private WebClient buildClient(ParticipantType role) {
         String baseUrl;
 
-        // MAP ROLES TO DOCKER PORTS
+        // MAP ROLES TO INJECTED PROPERTIES
         switch (role) {
             case MANUFACTURER:
-                baseUrl = "http://localhost:7000"; // Node 0
+                baseUrl = manufacturerNodeUrl;
                 break;
             case ZAMMSA: // Distributor
-                baseUrl = "http://localhost:7001"; // Node 1
+                baseUrl = zammsaNodeUrl;
                 break;
             case PHARMACY:
-                baseUrl = "http://localhost:7002"; // Node 2
+                baseUrl = pharmacyNodeUrl;
                 break;
             case ZAMRA: // Regulator
-                baseUrl = "http://localhost:7003"; // Node 3
+                baseUrl = zamraNodeUrl;
                 break;
             default:
                 throw new IllegalArgumentException("No Firefly Node configured for role: " + role);

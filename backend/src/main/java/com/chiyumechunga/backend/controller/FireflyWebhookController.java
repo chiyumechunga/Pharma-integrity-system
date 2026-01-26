@@ -1,77 +1,74 @@
 package com.chiyumechunga.backend.controller;
 
 import com.chiyumechunga.backend.dto.firefly.FireflyEventDto;
+import com.chiyumechunga.backend.model.FailedEvent;
+import com.chiyumechunga.backend.repository.FailedEventRepository;
 import com.chiyumechunga.backend.service.EventProcessingService;
+import com.fasterxml.jackson.core.JsonProcessingException;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
-import org.springframework.web.bind.annotation.PostMapping;
-import org.springframework.web.bind.annotation.RequestBody;
-import org.springframework.web.bind.annotation.RequestMapping;
-import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.bind.annotation.*;
 
 @Slf4j
 @RestController
-@RequestMapping("/api/v1/webhooks/firefly")
+@RequestMapping("/api/v1/webhooks")
+@RequiredArgsConstructor
 public class FireflyWebhookController {
 
-    private final EventProcessingService eventProcessingService;
-
-    // CONSTANT: The specific event type your Chaincode emits
-    private static final String EVENT_TYPE_BLOCKCHAIN = "blockchain_event_received";
-
-    public FireflyWebhookController(EventProcessingService eventProcessingService) {
-        this.eventProcessingService = eventProcessingService;
-    }
+    private final EventProcessingService eventService;
+    private final FailedEventRepository failedEventRepo; // <--- Injected for the fix
+    private final ObjectMapper objectMapper;             // <--- Injected to serialize payload
 
     /**
-     * UNIVERSAL EVENT RECEIVER:
-     * Handles ALL Blockchain events:
-     * 1. CreateAsset (Registry)
-     * 2. TransferCustody (Supply Chain)
-     * 3. SubmitTestResult (Regulatory)
-     *
-     * Firefly Subscription should point to: POST /api/v1/webhooks/firefly
+     * Entry point for all Blockchain Events (Webhooks from Firefly).
      */
-    @PostMapping // <--- CHANGED: Removed "/assets" to make it the default handler for this path
-    public ResponseEntity<Void> handleBlockchainEvent(@RequestBody FireflyEventDto event) {
-        log.info("🔔 Webhook Triggered | Type: {} | ID: {}", event.type(), event.id());
+    @PostMapping("/firefly")
+    public ResponseEntity<Void> receiveBlockchainEvent(@RequestBody FireflyEventDto event) {
+        log.info("🔔 Webhook Received: Event ID {}", event.id());
 
-        // 1. FILTERING: Only process explicit blockchain events
-        if (!EVENT_TYPE_BLOCKCHAIN.equals(event.type())) {
-            log.debug("Skipping non-blockchain event (Ping/System): {}", event.type());
-            return ResponseEntity.ok().build();
-        }
-
-        // 2. NULL SAFETY: Validation check
-        if (event.output() == null || event.output().data() == null) {
-            log.warn("⚠️ Ignored Empty Payload Event ID: {}", event.id());
-            return ResponseEntity.ok().build();
-        }
-
-        // 3. IDENTIFY SUB-TYPE (For Debugging)
-        // Firefly sends the "data" map. We can peek at it to see what kind of event it is.
-        // (The Service handles the actual logic, but logging it here helps you debug)
-        String qrHash = event.output().data().qrHash();
-        log.info("Processing Event for Product QR: {}", qrHash);
-
-        // 4. PROCESSING WITH RETRY LOGIC (Synchronous)
         try {
-            // This service method is the "Switchboard" that decides:
-            // "Is this a new asset? Save to Registry."
-            // "Is this a transfer? Update ChainOfCustody."
-            eventProcessingService.processBlockchainEvent(event);
+            // 1. Attempt to process the event immediately
+            eventService.processBlockchainEvent(event);
 
-            log.info("✅ Event Processed Successfully: {}", event.id());
+            log.info("✅ Event processed successfully.");
             return ResponseEntity.ok().build();
 
         } catch (Exception e) {
-            log.error("❌ CRITICAL: Failed to process Firefly event {}. Triggering RETRY.", event.id(), e);
+            log.error("❌ Error processing event {}. Saving to Dead Letter Queue.", event.id(), e);
 
-            // 5. RELIABILITY: Return 500 Internal Server Error
-            // Firefly will detect this 500 and automatically retry sending the event
-            // according to its "Reliable Delivery" policy (usually exponential backoff).
-            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).build();
+            // 2. THE FIX: Persist failure to DB instead of throwing 500
+            saveToDeadLetterQueue(event, e.getMessage());
+
+            // 3. Return 200 OK to Firefly
+            // This stops Firefly from retrying endlessly.
+            // Our internal Scheduler will now handle the retries calmly every 5 mins.
+            return ResponseEntity.ok().build();
+        }
+    }
+
+    private void saveToDeadLetterQueue(FireflyEventDto event, String errorMessage) {
+        try {
+            FailedEvent failedEvent = new FailedEvent();
+
+            // Extract Transaction ID safely (handle nulls if tx is missing)
+            String txId = (event.transaction() != null) ? event.transaction().id() : "UNKNOWN_TX";
+            failedEvent.setTxId(txId);
+
+            // Serialize the entire event object back to JSON so we can retry it exactly later
+            failedEvent.setRawPayload(objectMapper.writeValueAsString(event));
+
+            failedEvent.setErrorMessage(errorMessage);
+            failedEvent.setRetryCount(0);
+
+            failedEventRepo.save(failedEvent);
+            log.info("💾 Saved Event {} to FailedEventRepository.", event.id());
+
+        } catch (JsonProcessingException jsonEx) {
+            log.error("💥 Critical Failure: Could not serialize event to JSON for saving.", jsonEx);
+            // In this rare case, we might want to return 500 to keep Firefly trying,
+            // or just log it if we can't save it at all.
         }
     }
 }

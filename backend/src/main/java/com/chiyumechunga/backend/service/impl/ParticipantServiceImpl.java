@@ -44,7 +44,8 @@ public class ParticipantServiceImpl implements ParticipantService {
         participant.setBlockchainEnrollmentId(request.blockchainEnrollmentId());
 
         // 3. Set Defaults & Security
-        participant.setRole(ParticipantType.valueOf(request.participantType()));
+        // CORRECT: Use the existing field name from your DTO
+        participant.setRole(request.participantType());
         participant.setActive(true); // Default to active? Or false if approval needed?
 
         // CRITICAL: Hash the password before saving!
