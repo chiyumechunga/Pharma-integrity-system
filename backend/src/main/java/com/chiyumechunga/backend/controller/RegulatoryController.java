@@ -31,25 +31,21 @@ public class RegulatoryController {
         log.info("Received Lab Inspection. Sanitizing inputs...");
 
         // 1. STRICT SANITIZATION
-        // The 'labNotes' is a free-text field, making it a high risk for XSS.
-        // We use HtmlUtils to escape characters (e.g., <script> becomes &lt;script&gt;)
         LabInspectionRequestDto safeRequest = new LabInspectionRequestDto(
-                request.registryId(),  // UUID: Safe by type
-                request.inspectorId(), // UUID: Safe by type
-                request.testResult(),  // Enum: Safe by strict typing
-                HtmlUtils.htmlEscape(request.labNotes()) // TEXT: Needs Escaping
+                request.registryId(),
+                request.inspectorId(),
+                request.testResult(),
+                HtmlUtils.htmlEscape(request.labNotes())
         );
 
-        // 2. PROCESS
-        FireflyAckDto serviceResponse = regulatoryService.submitInspection(safeRequest);
+        // 2. PROCESS - FIXED: Changed method name to match Interface
+        FireflyAckDto serviceResponse = regulatoryService.recordLabInspection(safeRequest);
 
         // 3. BREAK TAINT CHAIN
-        // We construct a clean response. We do NOT return the 'labNotes' or other inputs.
-        // This ensures the response is purely system-generated.
         FireflyAckDto cleanResponse = new FireflyAckDto(
-                serviceResponse.operationId(), // System Generated
-                "PROCESSING",                  // Hardcoded
-                "Inspection data queued for blockchain." // Hardcoded
+                serviceResponse.operationId(),
+                "PROCESSING",
+                "Inspection data queued for blockchain."
         );
 
         // 4. SECURITY HEADERS

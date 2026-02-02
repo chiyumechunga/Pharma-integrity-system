@@ -1,6 +1,6 @@
 plugins {
     id 'java'
-    id 'org.springframework.boot' version '3.5.9' // Latest 3.x stable release as of Dec 2025
+    id 'org.springframework.boot' version '3.4.1'
     id 'io.spring.dependency-management' version '1.1.7'
     id 'org.asciidoctor.jvm.convert' version '4.0.5'
 }
@@ -30,37 +30,34 @@ ext {
 }
 
 dependencies {
-    // --- Spring Boot Starters ---
+// --- Spring Boot Starters (Versions managed by the plugin) ---
     implementation 'org.springframework.boot:spring-boot-starter-data-jpa'
     implementation 'org.springframework.boot:spring-boot-starter-security'
     implementation 'org.springframework.boot:spring-boot-starter-web'
     implementation 'org.springframework.boot:spring-boot-starter-webflux'
-
-    // Replaces manual Jakarta/Hibernate Validator dependencies
     implementation 'org.springframework.boot:spring-boot-starter-validation'
+    implementation 'org.springframework.boot:spring-boot-starter-actuator'
 
-    // --- Third Party ---
-    implementation 'org.springdoc:springdoc-openapi-starter-webmvc-ui:3.0.1'
-    implementation 'org.apache.commons:commons-lang3:3.20.0' // Updated to latest stable
+    // --- Third Party (Aligned with Spring Boot 3.4.x) ---
+    // v2.8.4 is the stable standard for Spring Boot 3.x
+    implementation 'org.springdoc:springdoc-openapi-starter-webmvc-ui:2.8.4'
+    implementation 'org.apache.commons:commons-lang3:3.20.0'
 
     // --- Tooling & Drivers ---
     compileOnly 'org.projectlombok:lombok'
     annotationProcessor 'org.projectlombok:lombok'
     developmentOnly 'org.springframework.boot:spring-boot-devtools'
-    runtimeOnly 'org.postgresql:postgresql' // Version managed by Spring Boot
+    runtimeOnly 'org.postgresql:postgresql'
 
-    // --- jwt stuff
-    implementation 'io.jsonwebtoken:jjwt-api:0.13.0'
-    implementation 'io.jsonwebtoken:jjwt-impl:0.13.0'
-    implementation 'io.jsonwebtoken:jjwt-jackson:0.13.0'
+    // --- Security / JWT (Stable 0.12+ series) ---
+    implementation 'io.jsonwebtoken:jjwt-api:0.12.6'
+    runtimeOnly 'io.jsonwebtoken:jjwt-impl:0.12.6'
+    runtimeOnly 'io.jsonwebtoken:jjwt-jackson:0.12.6'
 
     // --- Testing ---
-    // Includes JUnit 5, Mockito, AssertJ, etc.
     testImplementation 'org.springframework.boot:spring-boot-starter-test'
     testImplementation 'org.springframework.security:spring-security-test'
-    testImplementation 'org.springframework.restdocs:spring-restdocs-mockmvc'
-    testImplementation 'org.springframework.boot:spring-boot-starter-test'
-}
+    testImplementation 'org.springframework.restdocs:spring-restdocs-mockmvc'}
 
 tasks.named('test') {
     outputs.dir snippetsDir

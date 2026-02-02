@@ -43,4 +43,7 @@ public class ChainOfCustodyEvent {
     @CreationTimestamp
     @Column(name = "event_timestamp", updatable = false)
     private LocalDateTime eventTimestamp;
+
+    @Column(name = "quantity")
+    private Integer quantity;
 }

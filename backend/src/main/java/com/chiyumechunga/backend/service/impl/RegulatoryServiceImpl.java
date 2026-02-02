@@ -26,37 +26,36 @@ public class RegulatoryServiceImpl implements RegulatoryService {
     private final FireflyIntegrationService fireflyService;
     private final SupplyChainParticipantRepository participantRepository;
     private final RegulatoryScrutinyRepository scrutinyRepository;
-    // Added Registry repository to link the product to the inspection
     private final PharmaceuticalRegistryRepository registryRepository;
 
     @Override
-    public FireflyAckDto submitInspection(LabInspectionRequestDto request) {
+    public FireflyAckDto recordLabInspection(LabInspectionRequestDto request) {
         log.info("Verifying Inspector Identity for Registry ID: {}", request.registryId());
 
-        // 1. SECURITY CHECK: Verify the inspector exists
+        // 1. SECURITY CHECK
         SupplyChainParticipant inspector = participantRepository.findById(request.inspectorId())
                 .orElseThrow(() -> new ResourceNotFoundException("Inspector ID not found."));
 
-        // 2. ROLE-BASED ACCESS CONTROL (RBAC): Ensure only ZAMRA can do this
-        if (inspector.getRole() != ParticipantType.ZAMRA) { // <--- Changed to getRole()
+        // 2. RBAC
+        if (inspector.getRole() != ParticipantType.ZAMRA) {
             log.warn("SECURITY ALERT: Unauthorized inspection attempt by participant ID: {}", request.inspectorId());
             throw new RuntimeException("Unauthorized: Only ZAMRA can record inspections.");
         }
 
-        // 3. FETCH PRODUCT: Get the registry entry to attach to the scrutiny
+        // 3. FETCH PRODUCT
         PharmaceuticalRegistry registry = registryRepository.findById(request.registryId())
                 .orElseThrow(() -> new ResourceNotFoundException("Product registry ID not found."));
 
-        // 4. LOG LOCALLY: Save inspection to off-chain DB
+        // 4. LOG LOCALLY
         RegulatoryScrutiny scrutiny = new RegulatoryScrutiny();
-        scrutiny.setRegistry(registry); // Link the product
-        scrutiny.setInspector(inspector); // Link the inspector
-        scrutiny.setScrutinyDate(LocalDate.now()); // Fixed: uses LocalDate and correct setter
-        scrutiny.setTestResult(request.testResult()); // Fixed: uses TestResult enum
-        scrutiny.setLabNotes(request.labNotes()); // Fixed: uses labNotes
+        scrutiny.setRegistry(registry);
+        scrutiny.setInspector(inspector);
+        scrutiny.setScrutinyDate(LocalDate.now());
+        scrutiny.setTestResult(request.testResult());
+        scrutiny.setLabNotes(request.labNotes());
         scrutinyRepository.save(scrutiny);
 
-        // 5. INVOKE BLOCKCHAIN: Route to Port 7003 (ZAMRA Node)
+        // 5. INVOKE BLOCKCHAIN
         String opId = fireflyService.invokeContract(
                 "SubmitTestResult",
                 request,
@@ -69,4 +68,6 @@ public class RegulatoryServiceImpl implements RegulatoryService {
                 "Lab results verified and submitted to blockchain for consensus."
         );
     }
+
+    // REMOVED: The duplicate/dummy 'submitInspection' method was deleted here.
 }

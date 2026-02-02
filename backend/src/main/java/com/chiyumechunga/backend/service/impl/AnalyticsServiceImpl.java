@@ -4,6 +4,7 @@ import com.chiyumechunga.backend.dto.DashboardStatsDto;
 import com.chiyumechunga.backend.dto.analytics.ExpiryRiskDto;
 import com.chiyumechunga.backend.dto.analytics.LabQualityReportDto;
 import com.chiyumechunga.backend.dto.analytics.SuspiciousScanDto;
+import com.chiyumechunga.backend.repository.ChainOfCustodyRepository;
 import com.chiyumechunga.backend.repository.PharmaceuticalRegistryRepository;
 import com.chiyumechunga.backend.repository.ProductVerificationRepository;
 import com.chiyumechunga.backend.repository.RegulatoryScrutinyRepository;
@@ -13,6 +14,8 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 
+import java.math.BigDecimal;
+import java.math.RoundingMode;
 import java.time.LocalDate;
 import java.time.temporal.ChronoUnit;
 import java.util.ArrayList;
@@ -28,45 +31,60 @@ public class AnalyticsServiceImpl implements AnalyticsService {
     private final PharmaceuticalRegistryRepository registryRepo;
     private final RegulatoryScrutinyRepository scrutinyRepo;
     private final SupplyChainParticipantRepository participantRepo;
+    private final ChainOfCustodyRepository custodyRepo; // Added for transfer stats
 
     /**
      * D. EXECUTIVE OVERVIEW
-     * Logic: Aggregates total counts. Updated to use String status instead of boolean.
+     * Logic: Aggregates all 8 KPIs required by the DashboardStatsDto.
      */
     @Override
     public DashboardStatsDto getDashboardOverview() {
-        long totalBatches = registryRepo.count();
-        long totalParticipants = participantRepo.count();
+        // 1. Batch Stats
+        long authenticBatches = registryRepo.countByCurrentStatus("CONFIRMED"); // or "ON_CHAIN" depending on your flow
+        long pendingBatches = registryRepo.countByCurrentStatus("PENDING_BLOCKCHAIN");
+        long failedBatches = registryRepo.countByCurrentStatus("BLOCKCHAIN_FAILED");
 
-        // FIX: The database now uses strings ('AUTHENTIC', 'COUNTERFEIT', etc.)
-        // instead of a simple boolean 'isValid'.
-        long successScans = verificationRepo.countByVerificationStatus("AUTHENTIC");
-
-        // We calculate failed scans by subtracting authentic ones from the total
+        // 2. Scan Stats
         long totalScans = verificationRepo.count();
-        long failedScans = totalScans - successScans;
+        long authenticScans = verificationRepo.countByVerificationStatus("AUTHENTIC");
+        long flaggedScans = totalScans - authenticScans; // Expired, Counterfeit, etc.
 
+        // 3. Authenticity Rate Calculation
+        BigDecimal authenticityRate = BigDecimal.ZERO;
+        if (totalScans > 0) {
+            authenticityRate = BigDecimal.valueOf(authenticScans)
+                    .multiply(BigDecimal.valueOf(100))
+                    .divide(BigDecimal.valueOf(totalScans), 2, RoundingMode.HALF_UP);
+        }
+
+        // 4. Activity Stats
+        long totalTransfers = custodyRepo.count();
+
+        // FIX: Initialize as BigDecimal to match new DTO signature
+        BigDecimal avgLatency = BigDecimal.ZERO;
+
+        // 5. Return Full DTO (8 Arguments)
         return new DashboardStatsDto(
-                totalBatches,
-                totalParticipants,
-                failedScans,
-                successScans
+                authenticBatches,
+                pendingBatches,
+                failedBatches,
+                authenticScans,
+                flaggedScans,
+                authenticityRate,
+                totalTransfers,
+                avgLatency
         );
     }
 
     /**
      * SECURITY ALERTS
-     * Logic: uses the custom JPQL query 'findPotentialClones' to find QR hashes
-     * that appear in multiple locations or have excessive scan counts.
      */
     @Override
     public List<SuspiciousScanDto> getSuspiciousScanAlerts() {
-        // This relies on the custom query we added to ProductVerificationRepository
         List<Object[]> anomalies = verificationRepo.findPotentialClones();
         List<SuspiciousScanDto> alerts = new ArrayList<>();
 
         for (Object[] row : anomalies) {
-            // Row[0] = QR Hash, Row[1] = Count
             String qrHash = row[0].toString();
             long count = ((Number) row[1]).longValue();
 
@@ -82,7 +100,6 @@ public class AnalyticsServiceImpl implements AnalyticsService {
 
     /**
      * EXPIRY RISK
-     * Logic: Filters the registry for items expiring soon that haven't been dispensed.
      */
     @Override
     public List<ExpiryRiskDto> getExpiryRiskOverview(int daysThreshold) {
@@ -90,12 +107,12 @@ public class AnalyticsServiceImpl implements AnalyticsService {
 
         return registryRepo.findAll().stream()
                 .filter(batch -> batch.getExpiryDate() != null && batch.getExpiryDate().isBefore(thresholdDate))
-                .filter(batch -> !"DISPENSED".equals(batch.getCurrentStatus())) // Ignore items already sold
+                .filter(batch -> !"DISPENSED".equals(batch.getCurrentStatus()))
                 .map(batch -> new ExpiryRiskDto(
                         batch.getProductName(),
                         batch.getBatchNumber(),
                         batch.getExpiryDate(),
-                        "Unknown", // Owner logic can be complex, skipping for basic overview
+                        "Unknown",
                         ChronoUnit.DAYS.between(LocalDate.now(), batch.getExpiryDate())
                 ))
                 .collect(Collectors.toList());
@@ -103,7 +120,6 @@ public class AnalyticsServiceImpl implements AnalyticsService {
 
     /**
      * QUALITY REPORTS
-     * Logic: Uses the custom JPQL query 'getFailureRatesByManufacturer' to aggregate lab results.
      */
     @Override
     public List<LabQualityReportDto> getLabQualityStats() {
@@ -111,7 +127,6 @@ public class AnalyticsServiceImpl implements AnalyticsService {
         List<LabQualityReportDto> report = new ArrayList<>();
 
         for (Object[] row : stats) {
-            // Row structure from Query: [ManufacturerName, TotalTests, FailedTests]
             String manufacturer = (String) row[0];
             long total = ((Number) row[1]).longValue();
             long failures = ((Number) row[2]).longValue();

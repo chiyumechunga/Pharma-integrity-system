@@ -1,6 +1,9 @@
 package com.chiyumechunga.backend.service;
 
 import com.chiyumechunga.backend.dto.firefly.FireflyEventDto;
+import com.chiyumechunga.backend.model.EventCheckpoint;
+
+import java.util.UUID;
 
 public interface EventProcessingService {
     /**
@@ -9,4 +12,5 @@ public interface EventProcessingService {
      * * @param event The JSON payload from the Firefly Webhook
      */
     void processBlockchainEvent(FireflyEventDto event);
+
 }

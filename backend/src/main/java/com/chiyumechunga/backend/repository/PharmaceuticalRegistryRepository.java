@@ -12,4 +12,6 @@ public interface PharmaceuticalRegistryRepository extends JpaRepository<Pharmace
 
     Optional<PharmaceuticalRegistry> findByQrHash(String qrHash);
     boolean existsByQrHash(String qrHash);
+
+    long countByCurrentStatus(String confirmed);
 }

@@ -19,30 +19,30 @@ import java.util.UUID;
 
 @Slf4j
 @Service
-@RequiredArgsConstructor // Automatically injects all 'final' fields (cleaner code)
+@RequiredArgsConstructor
 public class EventProcessingServiceImpl implements EventProcessingService {
 
-    // 1. REPOSITORIES NEEDED
     private final PharmaceuticalRegistryRepository registryRepo;
-    private final SupplyChainParticipantRepository participantRepo; // Needed to find manufacturer
-    private final EventCheckpointRepository checkpointRepo;         // Needed for reliability
-    private final FailedEventRepository failedEventRepo;            // Needed for error logging
+    private final SupplyChainParticipantRepository participantRepo;
+    private final EventCheckpointRepository checkpointRepo;
+    private final FailedEventRepository failedEventRepo;
 
     @Override
     @Transactional
     public void processBlockchainEvent(FireflyEventDto event) {
-        String eventId = event.id();
+        // event.id() is already a UUID based on your updated DTO
+        UUID eventId = event.id();
         log.info("Processing Firefly Event ID: {}", eventId);
 
-        // 2. SAFETY CHECK: Empty Data
+        // 2. SAFETY CHECK
         if (event.output() == null || event.output().data() == null) {
             log.warn("Received empty event payload. Ignoring.");
             return;
         }
 
-        // 3. IDEMPOTENCY CHECK (Reliability)
-        // If we processed this specific event ID before, stop immediately.
-        if (checkpointRepo.existsById(eventId)) {
+        // 3. IDEMPOTENCY CHECK
+        // FIX 1: Convert UUID -> String because Checkpoint ID is VARCHAR in DB
+        if (checkpointRepo.existsById(eventId.toString())) {
             log.info("Event {} already processed. Skipping.", eventId);
             return;
         }
@@ -52,16 +52,18 @@ public class EventProcessingServiceImpl implements EventProcessingService {
             var data = event.output().data();
             String qrHash = data.qrHash();
 
-            // Check duplicate QR (Business Logic Idempotency)
+            // Business Logic Idempotency
             if (registryRepo.existsByQrHash(qrHash)) {
                 log.info("Asset with QR Hash {} already exists in DB.", qrHash);
-                saveCheckpoint(eventId, event.sequence()); // Mark as handled
+                // FIX 2: Convert UUID -> String for the helper method
+                saveCheckpoint(eventId.toString(), event.sequence());
                 return;
             }
 
-            // 5. THE BRIDGE: Convert ID String -> Entity Object
-            // This fixes your compilation error.
-            UUID manufacturerUuid = UUID.fromString(data.manufacturerId());
+            // 5. THE BRIDGE
+            // FIX 3: Removed UUID.fromString() because manufacturerId() is ALREADY a UUID
+            UUID manufacturerUuid = data.manufacturerId();
+
             SupplyChainParticipant manufacturer = participantRepo.findById(manufacturerUuid)
                     .orElseThrow(() -> new RuntimeException("Manufacturer not found with ID: " + manufacturerUuid));
 
@@ -70,37 +72,35 @@ public class EventProcessingServiceImpl implements EventProcessingService {
             entity.setQrHash(qrHash);
             entity.setProductName(data.productName());
             entity.setBatchNumber(data.batchNumber());
-
-            // KEY FIX: Setting the Object, not the ID
             entity.setManufacturer(manufacturer);
-
             entity.setExpiryDate(data.expiryDate());
             entity.setFireflyId(eventId);
-            entity.setBlockchainTxId(event.transaction().id());
-            entity.setCurrentStatus("ON_CHAIN"); // Confirmed status
+
+            // Handle potentially null transaction
+            if (event.transaction() != null) {
+                entity.setBlockchainTxId(event.transaction().id());
+            }
+
+            entity.setCurrentStatus("ON_CHAIN");
 
             // 7. SAVE TO DB
             registryRepo.save(entity);
 
-            // 8. SAVE CHECKPOINT (Success)
-            saveCheckpoint(eventId, event.sequence());
+            // 8. SAVE CHECKPOINT
+            // FIX 4: Convert UUID -> String
+            saveCheckpoint(eventId.toString(), event.sequence());
 
-            log.info("✅ projected Asset {} (Batch {}) to Database.", data.productName(), data.batchNumber());
+            log.info("✅ Projected Asset {} (Batch {}) to Database.", data.productName(), data.batchNumber());
 
         } catch (Exception e) {
             log.error("Failed to process blockchain event {}", eventId, e);
 
-            // 9. FAULT TOLERANCE (Save failure for later retry)
+            // 9. FAULT TOLERANCE
             FailedEvent failure = new FailedEvent();
             failure.setTxId(event.transaction() != null ? event.transaction().id() : "UNKNOWN");
             failure.setRawPayload(event.toString());
             failure.setErrorMessage(e.getMessage());
             failedEventRepo.save(failure);
-
-            // We do NOT throw the exception here.
-            // We swallow it so the Controller returns 200 OK to Firefly.
-            // Why? If we return 500, Firefly keeps retrying endlessly, jamming the queue.
-            // We handle the error locally in 'failed_events' table instead.
         }
     }
 

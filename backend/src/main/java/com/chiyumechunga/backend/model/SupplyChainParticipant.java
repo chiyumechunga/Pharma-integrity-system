@@ -4,6 +4,8 @@ import jakarta.persistence.*;
 import lombok.AllArgsConstructor;
 import lombok.Data;
 import lombok.NoArgsConstructor;
+
+import java.time.LocalDateTime;
 import java.util.UUID;
 
 @Data
@@ -38,8 +40,13 @@ public class SupplyChainParticipant {
     @Column(unique = true)
     private String email;
 
-    private String password;
+    @Column(name = "password_hash")
+    private String password; // Hibernate will now map the Java 'password' to the SQL 'password_hash' column
 
     @Column(name = "is_active")
     private boolean isActive = true;
+
+    @org.hibernate.annotations.CreationTimestamp
+    @Column(name = "created_at", updatable = false)
+    private LocalDateTime createdAt;
 }

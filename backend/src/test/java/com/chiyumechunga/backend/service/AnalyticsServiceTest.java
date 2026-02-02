@@ -1,4 +1,4 @@
-package com.chiyumechunga.backend.service.impl;
+package com.chiyumechunga.backend.service;
 
 public class AnalyticsServiceTest {
 }

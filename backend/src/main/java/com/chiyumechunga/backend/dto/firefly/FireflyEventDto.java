@@ -4,9 +4,11 @@ import com.chiyumechunga.backend.TransactionInfo; // Ensure this matches your pa
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import com.fasterxml.jackson.annotation.JsonProperty;
 
+import java.util.UUID;
+
 @JsonIgnoreProperties(ignoreUnknown = true)
 public record FireflyEventDto(
-        String id,
+        UUID id,
         String sequence, // <--- ADD THIS FIELD (The Fix)
         String type,
         String namespace,

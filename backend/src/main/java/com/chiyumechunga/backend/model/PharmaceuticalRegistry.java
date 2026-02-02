@@ -53,7 +53,7 @@ public class PharmaceuticalRegistry {
     private String blockchainTxId;
 
     @Column(name = "firefly_id")
-    private String fireflyId;
+    private java.util.UUID fireflyId;
 
     @CreationTimestamp
     @Column(name = "created_at", updatable = false)

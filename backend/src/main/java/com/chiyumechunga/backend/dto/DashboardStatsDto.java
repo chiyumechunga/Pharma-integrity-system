@@ -1,8 +1,14 @@
 package com.chiyumechunga.backend.dto;
 
+import java.math.BigDecimal;
+
 public record DashboardStatsDto(
-        long totalRegisteredBatches,
-        long totalParticipants,
-        long failedScans,   // Critical: Potential counterfeits
-        long successfulScans
+        Long authenticBatches,
+        Long pendingBatches,
+        Long failedBatches,
+        Long totalScans,
+        Long suspiciousScans,
+        java.math.BigDecimal authenticityRate, // Update this type
+        Long totalTransfers,
+        BigDecimal avgLatency
 ) {}

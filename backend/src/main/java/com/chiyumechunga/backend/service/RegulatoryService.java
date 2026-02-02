@@ -4,5 +4,5 @@ import com.chiyumechunga.backend.dto.FireflyAckDto;
 import com.chiyumechunga.backend.dto.LabInspectionRequestDto;
 
 public interface RegulatoryService {
-    FireflyAckDto submitInspection(LabInspectionRequestDto request);
+    FireflyAckDto recordLabInspection(LabInspectionRequestDto request);
 }
