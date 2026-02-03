@@ -1,0 +1,41 @@
+plugins {
+    id 'java'
+    // CHANGED: Version 7.1.2 -> 8.1.1 to fix the 'convention' error
+    id 'com.github.johnrengelman.shadow' version '8.1.1'
+}
+
+// Your Custom Identity
+group = 'com.chiyumechunga.chaincode'
+version = '0.0.1-SNAPSHOT'
+description = 'Chaincode for Pharmaceutical Integrity System'
+
+repositories {
+    mavenCentral()
+    maven {
+        url 'https://jitpack.io'
+    }
+}
+
+dependencies {
+    implementation 'org.hyperledger.fabric-chaincode-java:fabric-chaincode-shim:2.5.0'
+    implementation 'com.owlike:genson:1.6'
+
+    testImplementation 'org.junit.jupiter:junit-jupiter:5.8.1'
+    testImplementation 'org.mockito:mockito-core:4.8.0'
+    testImplementation platform('org.junit:junit-bom:5.10.0')
+    testRuntimeOnly 'org.junit.platform:junit-platform-launcher'
+}
+
+test {
+    useJUnitPlatform()
+}
+
+shadowJar {
+    archiveBaseName.set('chaincode') // 'baseName' is deprecated, use 'archiveBaseName'
+    archiveVersion.set('')           // 'version' is deprecated, use 'archiveVersion'
+    archiveClassifier.set('')        // 'classifier' is deprecated, use 'archiveClassifier'
+
+    manifest {
+        attributes 'Main-Class': 'org.hyperledger.fabric.contract.ContractRouter'
+    }
+}

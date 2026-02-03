@@ -5,3 +5,17 @@ node_modules/
 .DS_Store
 mytests
 lib/
+# Ignore Gradle Cache and Build dirs
+.gradle/
+build/
+out/
+bin/
+
+# Ignore compiled Java classes
+*.class
+
+# Ignore IntelliJ/IDE specific files
+.idea/
+*.iml
+*.iws
+*.ipr
