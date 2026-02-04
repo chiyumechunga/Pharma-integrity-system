@@ -7,14 +7,21 @@ import org.hyperledger.fabric.shim.ChaincodeException;
 import org.hyperledger.fabric.shim.ChaincodeStub;
 import com.owlike.genson.Genson;
 import java.time.Instant;
+import java.time.LocalDate;
+import java.time.ZoneId;
+import java.time.format.DateTimeParseException;
 
+/**
+ * Smart Contract enforcing ZAMMSA/ZAMRA compliance rules.
+ * Handles lifecycle transitions and emits events for PostgreSQL synchronization.
+ */
 @Contract(
         name = "PharmaIntegrity",
         info = @Info(
                 title = "Pharma Integrity Contract",
-                description = "Smart Contract for ZAMMSA/ZAMRA ecosystem used in the Blockchain Application",
-                version = "1.0.0",
-                contact = @Contact(email = "chiyumechunga@gmail.com", name = "Chiyume Chunga")
+                description = "Smart Contract for ZAMMSA/ZAMRA ecosystem",
+                version = "1.0.3",
+                contact = @Contact(email = "chiyume@capstone.zm", name = "Chiyume Chunga")
         )
 )
 @Default
@@ -22,7 +29,9 @@ public class PharmaIntegrity implements ContractInterface {
 
     private final Genson genson = new Genson();
 
-    // --- EVENT MODELS (Must match Backend DTOs) ---
+    // --- Event Models (Mapped 1:1 to Postgres Tables) ---
+
+    /** Table: pharmaceutical_registry */
     class ManufactureEvent {
         public String batchId;
         public String qrHash;
@@ -33,6 +42,7 @@ public class PharmaIntegrity implements ContractInterface {
         public String timestamp;
     }
 
+    /** Table: chain_of_custody_events */
     class CustodyEvent {
         public String batchId;
         public String fromParticipant;
@@ -42,6 +52,7 @@ public class PharmaIntegrity implements ContractInterface {
         public String timestamp;
     }
 
+    /** Table: regulatory_scrutiny */
     class ScrutinyEvent {
         public String batchId;
         public String inspectorId;
@@ -51,15 +62,15 @@ public class PharmaIntegrity implements ContractInterface {
         public String timestamp;
     }
 
-    // Triggers a 'sale_event' in Postgres
+    /** Mapped to Dispensing Logic / Sales */
     class DispenseEvent {
         public String batchId;
-        public String pharmacyId; // The MSP ID of the pharmacy
+        public String pharmacyId;
         public String txId;
         public String timestamp;
     }
 
-    // Triggers an 'emergency_alert' in Postgres
+    /** Emergency System */
     class RecallEvent {
         public String batchId;
         public String regulatorId;
@@ -68,40 +79,38 @@ public class PharmaIntegrity implements ContractInterface {
         public String timestamp;
     }
 
-    // --- CONTRACT METHODS ---
+    // --- Contract Transactions ---
 
     /**
-     * 1. MANUFACTURE BATCH
-     * Creates the asset and triggers Postgres 'pharmaceutical_registry' insertion.
+     * Creates a new batch asset and triggers off-chain DB insertion.
+     * @param manufacturerUuid Used to link Foreign Key in Postgres.
      */
     @Transaction(intent = Transaction.TYPE.SUBMIT)
     public DrugTruth manufacture(final Context ctx,
                                  final String batchId,
                                  final String qrHash,
                                  final String drugName,
-                                 final String expiryDate) {
+                                 final String expiryDate,
+                                 final String manufacturerUuid) {
 
         ChaincodeStub stub = ctx.getStub();
-        String txId = stub.getTxId();
-        String mspId = ctx.getClientIdentity().getMSPID();
 
         if (batchExists(ctx, batchId)) {
             throw new ChaincodeException("Batch " + batchId + " already exists", "DUPLICATE_BATCH");
         }
 
-        // 1. Write Truth to Ledger
-        // NEW / FIXED LINE
-        DrugTruth batch = new DrugTruth(batchId, qrHash, mspId, "MANUFACTURED", expiryDate);
+        // Store Logic: Save MSP (Chain Security) and UUID (DB Sync)
+        DrugTruth batch = new DrugTruth(batchId, qrHash, ctx.getClientIdentity().getMSPID(), manufacturerUuid, "MANUFACTURED", expiryDate);
         stub.putStringState(batchId, genson.serialize(batch));
 
-        // 2. Emit Event for Spring Boot
+        // Event Logic: Emit data required for 'pharmaceutical_registry'
         ManufactureEvent event = new ManufactureEvent();
         event.batchId = batchId;
         event.qrHash = qrHash;
         event.drugName = drugName;
-        event.manufacturerId = mspId;
+        event.manufacturerId = manufacturerUuid;
         event.expiryDate = expiryDate;
-        event.txId = txId;
+        event.txId = stub.getTxId();
         event.timestamp = Instant.ofEpochMilli(stub.getTxTimestamp().toEpochMilli()).toString();
 
         stub.setEvent("DrugManufactured", genson.serialize(event).getBytes());
@@ -110,40 +119,43 @@ public class PharmaIntegrity implements ContractInterface {
     }
 
     /**
-     * 2. TRANSFER CUSTODY
-     * Updates owner and triggers Postgres 'chain_of_custody_events' insertion.
+     * Transfers ownership (e.g. Manufacturer -> Distributor).
+     * @param newOwnerUuid UUID of the receiver for DB tracking.
      */
     @Transaction(intent = Transaction.TYPE.SUBMIT)
     public DrugTruth transfer(final Context ctx,
                               final String batchId,
-                              final String newOwnerMsp) {
+                              final String newOwnerMsp,
+                              final String newOwnerUuid) {
 
         ChaincodeStub stub = ctx.getStub();
-        String txId = stub.getTxId();
-        String currentOwner = ctx.getClientIdentity().getMSPID();
-
         DrugTruth batch = getBatchState(ctx, batchId);
+        String caller = ctx.getClientIdentity().getMSPID();
 
-        // Verification: Only the current owner can transfer
-        if (!batch.getCurrentOwner().equalsIgnoreCase(currentOwner)) {
-            // In production, uncomment strictly:
+        // Check 1: Ownership
+        if (!batch.getCurrentOwner().equalsIgnoreCase(caller)) {
             throw new ChaincodeException("Unauthorized: You do not own this batch", "ACCESS_DENIED");
         }
 
-        String oldOwner = batch.getCurrentOwner();
+        // Check 2: Safety
+        if (batch.getStatus().startsWith("RECALLED")) {
+            throw new ChaincodeException("Cannot transfer RECALLED batch", "SAFETY_VIOLATION");
+        }
 
-        // 1. Update Truth
+        // State Update
+        String oldOwnerUuid = batch.getCurrentOwnerUuid();
         batch.setCurrentOwner(newOwnerMsp);
+        batch.setCurrentOwnerUuid(newOwnerUuid);
         batch.setStatus("IN_TRANSIT");
         stub.putStringState(batchId, genson.serialize(batch));
 
-        // 2. Emit Event
+        // Event Logic: Emit data for 'chain_of_custody_events'
         CustodyEvent event = new CustodyEvent();
         event.batchId = batchId;
-        event.fromParticipant = oldOwner;
-        event.toParticipant = newOwnerMsp;
+        event.fromParticipant = oldOwnerUuid;
+        event.toParticipant = newOwnerUuid;
         event.eventType = "DISTRIBUTED";
-        event.txId = txId;
+        event.txId = stub.getTxId();
         event.timestamp = Instant.ofEpochMilli(stub.getTxTimestamp().toEpochMilli()).toString();
 
         stub.setEvent("CustodyTransferred", genson.serialize(event).getBytes());
@@ -152,29 +164,26 @@ public class PharmaIntegrity implements ContractInterface {
     }
 
     /**
-     * 3. INSPECT / RECALL
-     * Updates status and triggers Postgres 'regulatory_scrutiny' insertion.
+     * Records Lab Results from ZAMRA.
      */
     @Transaction(intent = Transaction.TYPE.SUBMIT)
     public DrugTruth inspect(final Context ctx,
                              final String batchId,
                              final String result,
-                             final String notes) {
+                             final String notes,
+                             final String inspectorUuid) {
 
         DrugTruth batch = getBatchState(ctx, batchId);
-        String txId = ctx.getStub().getTxId();
 
-        // 1. Update Truth
         batch.setStatus("INSPECTED_" + result);
         ctx.getStub().putStringState(batchId, genson.serialize(batch));
 
-        // 2. Emit Event
         ScrutinyEvent event = new ScrutinyEvent();
         event.batchId = batchId;
-        event.inspectorId = ctx.getClientIdentity().getMSPID();
+        event.inspectorId = inspectorUuid;
         event.result = result;
         event.notes = notes;
-        event.txId = txId;
+        event.txId = ctx.getStub().getTxId();
         event.timestamp = Instant.ofEpochMilli(ctx.getStub().getTxTimestamp().toEpochMilli()).toString();
 
         ctx.getStub().setEvent("LabInspectionCompleted", genson.serialize(event).getBytes());
@@ -183,15 +192,89 @@ public class PharmaIntegrity implements ContractInterface {
     }
 
     /**
-     * 4. VERIFY BATCH
-     * Read-only method for the public verification portal.
+     * Pharmacy sells to patient. Includes strict Expiry Check.
      */
+    @Transaction(intent = Transaction.TYPE.SUBMIT)
+    public DrugTruth dispense(final Context ctx, final String batchId) {
+
+        ChaincodeStub stub = ctx.getStub();
+        DrugTruth batch = getBatchState(ctx, batchId);
+        String caller = ctx.getClientIdentity().getMSPID();
+
+        if (!batch.getCurrentOwner().equalsIgnoreCase(caller)) {
+            throw new ChaincodeException("Unauthorized", "ACCESS_DENIED");
+        }
+
+        if (batch.getStatus().startsWith("RECALLED")) {
+            throw new ChaincodeException("Cannot dispense RECALLED batch", "SAFETY_VIOLATION");
+        }
+
+        // Critical Check: Is it expired?
+        try {
+            Instant txTime = Instant.ofEpochMilli(stub.getTxTimestamp().toEpochMilli());
+            LocalDate expiryDate = LocalDate.parse(batch.getExpiryDate());
+            Instant expiryInstant = expiryDate.atStartOfDay(ZoneId.of("UTC")).toInstant();
+
+            if (txTime.isAfter(expiryInstant)) {
+                throw new ChaincodeException("EXPIRY ALERT: Batch expired on " + batch.getExpiryDate(), "EXPIRED_DRUG");
+            }
+        } catch (DateTimeParseException e) {
+            throw new ChaincodeException("Invalid Expiry Date Format", "DATA_CORRUPTION");
+        }
+
+        batch.setStatus("DISPENSED");
+        stub.putStringState(batchId, genson.serialize(batch));
+
+        DispenseEvent event = new DispenseEvent();
+        event.batchId = batchId;
+        event.pharmacyId = batch.getCurrentOwnerUuid();
+        event.txId = stub.getTxId();
+        event.timestamp = Instant.ofEpochMilli(stub.getTxTimestamp().toEpochMilli()).toString();
+
+        stub.setEvent("DrugDispensed", genson.serialize(event).getBytes());
+
+        return batch;
+    }
+
+    /**
+     * ZAMRA Emergency Recall. Overrides ownership to freeze asset.
+     */
+    @Transaction(intent = Transaction.TYPE.SUBMIT)
+    public DrugTruth recall(final Context ctx, final String batchId, final String reason) {
+
+        ChaincodeStub stub = ctx.getStub();
+        String caller = ctx.getClientIdentity().getMSPID();
+
+        // RBAC: Only ZAMRA allowed
+        if (!caller.toLowerCase().contains("zamra")) {
+            throw new ChaincodeException("Unauthorized: Only ZAMRA can recall", "ACCESS_DENIED");
+        }
+
+        DrugTruth batch = getBatchState(ctx, batchId);
+
+        batch.setStatus("RECALLED: " + reason);
+        stub.putStringState(batchId, genson.serialize(batch));
+
+        RecallEvent event = new RecallEvent();
+        event.batchId = batchId;
+        event.regulatorId = caller;
+        event.reason = reason;
+        event.txId = stub.getTxId();
+        event.timestamp = Instant.ofEpochMilli(stub.getTxTimestamp().toEpochMilli()).toString();
+
+        stub.setEvent("EmergencyRecall", genson.serialize(event).getBytes());
+
+        return batch;
+    }
+
+    /** Public Read-Only Verification */
     @Transaction(intent = Transaction.TYPE.EVALUATE)
     public DrugTruth verifyBatch(final Context ctx, final String batchId) {
         return getBatchState(ctx, batchId);
     }
 
-    // --- HELPERS ---
+    // --- Helpers ---
+
     private DrugTruth getBatchState(Context ctx, String batchId) {
         String json = ctx.getStub().getStringState(batchId);
         if (json == null || json.isEmpty()) throw new ChaincodeException("Batch not found", "NOT_FOUND");
@@ -202,80 +285,4 @@ public class PharmaIntegrity implements ContractInterface {
         String json = ctx.getStub().getStringState(batchId);
         return (json != null && !json.isEmpty());
     }
-
-    /**
-     * 5. DISPENSE (Pharmacy sells to Patient)
-     * Marks the end of the supply chain lifecycle.
-     */
-    @Transaction(intent = Transaction.TYPE.SUBMIT)
-    public DrugTruth dispense(final Context ctx, final String batchId) {
-
-        ChaincodeStub stub = ctx.getStub();
-        String txId = stub.getTxId();
-        String caller = ctx.getClientIdentity().getMSPID();
-
-        DrugTruth batch = getBatchState(ctx, batchId);
-
-        // Verification: Only current owner can dispense
-        if (!batch.getCurrentOwner().equalsIgnoreCase(caller)) {
-            throw new ChaincodeException("Unauthorized: You do not own this batch", "ACCESS_DENIED");
-        }
-
-        // Verification: Cannot dispense recalled or expired drugs
-        if (batch.getStatus().contains("RECALLED")) {
-            throw new ChaincodeException("Cannot dispense RECALLED batch", "SAFETY_VIOLATION");
-        }
-
-        // 1. Update Truth
-        batch.setStatus("DISPENSED");
-        stub.putStringState(batchId, genson.serialize(batch));
-
-        // 2. Emit Event
-        DispenseEvent event = new DispenseEvent();
-        event.batchId = batchId;
-        event.pharmacyId = caller;
-        event.txId = txId;
-        event.timestamp = Instant.ofEpochMilli(stub.getTxTimestamp().toEpochMilli()).toString();
-
-        stub.setEvent("DrugDispensed", genson.serialize(event).getBytes());
-
-        return batch;
-    }
-
-    /**
-     * 6. RECALL (ZAMRA Emergency Action)
-     * Overrides ownership to lock a batch immediately.
-     */
-    @Transaction(intent = Transaction.TYPE.SUBMIT)
-    public DrugTruth recall(final Context ctx, final String batchId, final String reason) {
-
-        ChaincodeStub stub = ctx.getStub();
-        String txId = stub.getTxId();
-        String caller = ctx.getClientIdentity().getMSPID();
-
-        // Verification: Strict Role Check for ZAMRA
-        // You must replace "ZAMRAMSP" with your actual MSP ID from stack.json
-        if (!caller.contains("zamra") && !caller.contains("Regulator")) {
-            throw new ChaincodeException("Unauthorized: Only ZAMRA can recall batches", "ACCESS_DENIED");
-        }
-
-        DrugTruth batch = getBatchState(ctx, batchId);
-
-        // 1. Update Truth (Force Status)
-        batch.setStatus("RECALLED: " + reason);
-        stub.putStringState(batchId, genson.serialize(batch));
-
-        // 2. Emit Event
-        RecallEvent event = new RecallEvent();
-        event.batchId = batchId;
-        event.regulatorId = caller;
-        event.reason = reason;
-        event.txId = txId;
-        event.timestamp = Instant.ofEpochMilli(stub.getTxTimestamp().toEpochMilli()).toString();
-
-        stub.setEvent("EmergencyRecall", genson.serialize(event).getBytes());
-
-        return batch;
-    }
-
 }

@@ -30,7 +30,7 @@ public class EventProcessingServiceImpl implements EventProcessingService {
     @Override
     @Transactional
     public void processBlockchainEvent(FireflyEventDto event) {
-        // event.id() is already a UUID based on your updated DTO
+        // event.id() is already a UUID based on your updated DTO.
         UUID eventId = event.id();
         log.info("Processing Firefly Event ID: {}", eventId);
 
@@ -41,21 +41,21 @@ public class EventProcessingServiceImpl implements EventProcessingService {
         }
 
         // 3. IDEMPOTENCY CHECK
-        // FIX 1: Convert UUID -> String because Checkpoint ID is VARCHAR in DB
+        // FIX 1: Convert UUID -> String because Checkpoint ID is VARCHAR in DB.
         if (checkpointRepo.existsById(eventId.toString())) {
             log.info("Event {} already processed. Skipping.", eventId);
             return;
         }
 
         try {
-            // 4. EXTRACT DATA
+            // 4. EXTRACT DATA.
             var data = event.output().data();
             String qrHash = data.qrHash();
 
-            // Business Logic Idempotency
+            // Business Logic Idempotency.
             if (registryRepo.existsByQrHash(qrHash)) {
                 log.info("Asset with QR Hash {} already exists in DB.", qrHash);
-                // FIX 2: Convert UUID -> String for the helper method
+                // FIX 2: Convert UUID -> String for the helper method.
                 saveCheckpoint(eventId.toString(), event.sequence());
                 return;
             }

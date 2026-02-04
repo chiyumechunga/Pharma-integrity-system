@@ -15,7 +15,5 @@ bin/
 *.class
 
 # Ignore IntelliJ/IDE specific files
-.idea/
-*.iml
 *.iws
 *.ipr
