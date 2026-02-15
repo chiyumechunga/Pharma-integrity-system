@@ -1,7 +1,7 @@
 package com.chiyumechunga.chaincode;
 
+import com.owlike.genson.Genson;
 import com.owlike.genson.annotation.JsonProperty;
-import org.hyperledger.fabric.contract.ClientIdentity;
 import org.hyperledger.fabric.contract.Context;
 import org.hyperledger.fabric.contract.ContractInterface;
 import org.hyperledger.fabric.contract.annotation.Contract;
@@ -10,21 +10,11 @@ import org.hyperledger.fabric.contract.annotation.Info;
 import org.hyperledger.fabric.contract.annotation.Transaction;
 import org.hyperledger.fabric.shim.ChaincodeException;
 import org.hyperledger.fabric.shim.ChaincodeStub;
-import com.owlike.genson.Genson;
+import org.hyperledger.fabric.shim.ledger.KeyModification; // ADDED
+import org.hyperledger.fabric.shim.ledger.QueryResultsIterator; // ADDED
+
 import java.time.Instant;
 
-/**
- * Pharma Integrity Chaincode - Backend-Driven Authorization Model
- *
- * WORKFLOW:
- * 1. Backend creates batch on blockchain (WITHOUT qr_hash)
- * 2. Backend receives tx_id from blockchain
- * 3. Backend generates QR hash: SHA256(batch_number + tx_id + product_name + expiry_date)
- * 4. Backend calls AttachQRHash() to update the batch
- * 5. Backend stores everything in Postgres
- *
- * This separates concerns and reduces chaincode overhead.
- */
 @Contract(
         name = "PharmaIntegrity",
         info = @Info(
@@ -37,158 +27,73 @@ public final class PharmaIntegrity implements ContractInterface {
     private final Genson genson = new Genson();
 
     // ==========================================================
-    // EVENTS (Aligned to Backend DTOs & Postgres Schema)
+    // EVENTS
     // ==========================================================
 
     static class ManufactureEvent {
-        @JsonProperty("batch_number")
-        public String batchNumber;
-
-        @JsonProperty("product_id")
-        public String productId; // UUID from product_master table
-
-        @JsonProperty("product_name")
-        public String productName;
-
-        @JsonProperty("manufacturer_id")
-        public String manufacturerId;
-
-        @JsonProperty("manufacturing_date")
-        public String manufacturingDate;
-
-        @JsonProperty("expiry_date")
-        public String expiryDate;
-
-        @JsonProperty("tx_id")
-        public String txId;
-
-        @JsonProperty("invoked_by_msp")
-        public String invokedByMsp;
+        @JsonProperty("batch_number") public String batchNumber;
+        @JsonProperty("product_id") public String productId;
+        @JsonProperty("product_name") public String productName;
+        @JsonProperty("manufacturer_id") public String manufacturerId;
+        @JsonProperty("manufacturing_date") public String manufacturingDate;
+        @JsonProperty("expiry_date") public String expiryDate;
+        @JsonProperty("tx_id") public String txId;
+        @JsonProperty("invoked_by_msp") public String invokedByMsp;
     }
 
     static class QRHashAttachedEvent {
-        @JsonProperty("batch_number")
-        public String batchNumber;
-
-        @JsonProperty("qr_hash")
-        public String qrHash;
-
-        @JsonProperty("registry_id")
-        public String registryId; // From Postgres pharmaceutical_registry
-
-        @JsonProperty("tx_id")
-        public String txId;
+        @JsonProperty("batch_number") public String batchNumber;
+        @JsonProperty("qr_hash") public String qrHash;
+        @JsonProperty("registry_id") public String registryId;
+        @JsonProperty("tx_id") public String txId;
     }
 
     static class CustodyEvent {
-        @JsonProperty("batch_number")
-        public String batchNumber;
-
-        @JsonProperty("from_participant_uuid")
-        public String fromParticipantUuid;
-
-        @JsonProperty("to_participant_uuid")
-        public String toParticipantUuid;
-
-        @JsonProperty("event_type")
-        public String eventType; // MANUFACTURED, RECEIVED, DISTRIBUTED, DISPENSED
-
-        @JsonProperty("quantity")
-        public int quantity;
-
-        @JsonProperty("tx_id")
-        public String txId;
-
-        @JsonProperty("timestamp")
-        public String timestamp;
-
-        @JsonProperty("invoked_by_msp")
-        public String invokedByMsp;
+        @JsonProperty("batch_number") public String batchNumber;
+        @JsonProperty("from_participant_uuid") public String fromParticipantUuid;
+        @JsonProperty("to_participant_uuid") public String toParticipantUuid;
+        @JsonProperty("event_type") public String eventType;
+        @JsonProperty("quantity") public int quantity;
+        @JsonProperty("tx_id") public String txId;
+        @JsonProperty("timestamp") public String timestamp;
+        @JsonProperty("invoked_by_msp") public String invokedByMsp;
     }
 
     static class ScrutinyEvent {
-        @JsonProperty("batch_number")
-        public String batchNumber;
-
-        @JsonProperty("test_result")
-        public String testResult; // PASSED, FAILED, PENDING
-
-        @JsonProperty("lab_notes")
-        public String labNotes;
-
-        @JsonProperty("inspector_uuid")
-        public String inspectorUuid;
-
-        @JsonProperty("tx_id")
-        public String txId;
-
-        @JsonProperty("timestamp")
-        public String timestamp;
-
-        @JsonProperty("invoked_by_msp")
-        public String invokedByMsp;
+        @JsonProperty("batch_number") public String batchNumber;
+        @JsonProperty("test_result") public String testResult;
+        @JsonProperty("lab_notes") public String labNotes;
+        @JsonProperty("inspector_uuid") public String inspectorUuid;
+        @JsonProperty("tx_id") public String txId;
+        @JsonProperty("timestamp") public String timestamp;
+        @JsonProperty("invoked_by_msp") public String invokedByMsp;
     }
 
     static class RecallEvent {
-        @JsonProperty("batch_number")
-        public String batchNumber;
-
-        @JsonProperty("product_id")
-        public String productId; // May recall entire product line
-
-        @JsonProperty("recall_reason")
-        public String recallReason;
-
-        @JsonProperty("severity_level")
-        public String severityLevel; // CLASS_I, CLASS_II, CLASS_III
-
-        @JsonProperty("recalled_by_uuid")
-        public String recalledByUuid;
-
-        @JsonProperty("tx_id")
-        public String txId;
-
-        @JsonProperty("timestamp")
-        public String timestamp;
-
-        @JsonProperty("invoked_by_msp")
-        public String invokedByMsp;
+        @JsonProperty("batch_number") public String batchNumber;
+        @JsonProperty("product_id") public String productId;
+        @JsonProperty("recall_reason") public String recallReason;
+        @JsonProperty("severity_level") public String severityLevel;
+        @JsonProperty("recalled_by_uuid") public String recalledByUuid;
+        @JsonProperty("tx_id") public String txId;
+        @JsonProperty("timestamp") public String timestamp;
+        @JsonProperty("invoked_by_msp") public String invokedByMsp;
     }
 
     static class DispenseEvent {
-        @JsonProperty("batch_number")
-        public String batchNumber;
-
-        @JsonProperty("pharmacy_uuid")
-        public String pharmacyUuid;
-
-        @JsonProperty("patient_id")
-        public String patientId;
-
-        @JsonProperty("quantity")
-        public int quantity;
-
-        @JsonProperty("tx_id")
-        public String txId;
-
-        @JsonProperty("timestamp")
-        public String timestamp;
-
-        @JsonProperty("invoked_by_msp")
-        public String invokedByMsp;
+        @JsonProperty("batch_number") public String batchNumber;
+        @JsonProperty("pharmacy_uuid") public String pharmacyUuid;
+        @JsonProperty("patient_id") public String patientId;
+        @JsonProperty("quantity") public int quantity;
+        @JsonProperty("tx_id") public String txId;
+        @JsonProperty("timestamp") public String timestamp;
+        @JsonProperty("invoked_by_msp") public String invokedByMsp;
     }
 
     // ==========================================================
-    // TRANSACTIONS - Backend Authorization Model
+    // TRANSACTIONS
     // ==========================================================
 
-    /**
-     * Step 1: Create batch WITHOUT QR hash.
-     * Backend will generate QR hash after getting tx_id.
-     *
-     * @param productId UUID from product_master table
-     * @param manufacturingDate ISO date string
-     */
     @Transaction(intent = Transaction.TYPE.SUBMIT)
     public DrugTruth CreateAsset(final Context ctx,
                                  final String batchNumber,
@@ -201,30 +106,20 @@ public final class PharmaIntegrity implements ContractInterface {
 
         ChaincodeStub stub = ctx.getStub();
 
-        // Basic validation
         if (AssetExists(ctx, batchNumber)) {
             throw new ChaincodeException("Asset " + batchNumber + " already exists", "ASSET_ALREADY_EXISTS");
         }
-
         if (batchNumber == null || batchNumber.isEmpty()) {
             throw new ChaincodeException("Batch number cannot be empty", "INVALID_INPUT");
         }
 
-        // Create asset WITHOUT qr_hash (backend will add it)
         DrugTruth asset = new DrugTruth(
-                batchNumber,
-                productName,
-                manufacturerId,
-                expiryDate,
-                "", // qr_hash is empty initially
-                manufacturerMspId,
-                manufacturerId,
-                "PENDING_BLOCKCHAIN"
+                batchNumber, productName, manufacturerId, expiryDate,
+                "", manufacturerMspId, manufacturerId, "PENDING_BLOCKCHAIN"
         );
 
         stub.putStringState(batchNumber, genson.serialize(asset));
 
-        // Emit event
         ManufactureEvent event = new ManufactureEvent();
         event.batchNumber = batchNumber;
         event.productId = productId;
@@ -240,14 +135,6 @@ public final class PharmaIntegrity implements ContractInterface {
         return asset;
     }
 
-    /**
-     * Step 2: Backend calls this after generating QR hash.
-     *
-     * QR Hash Generation Logic (Backend):
-     * qr_hash = SHA256(batch_number + blockchain_tx_id + product_name + expiry_date)
-     *
-     * @param registryId UUID from pharmaceutical_registry table
-     */
     @Transaction(intent = Transaction.TYPE.SUBMIT)
     public DrugTruth AttachQRHash(final Context ctx,
                                   final String batchNumber,
@@ -257,27 +144,21 @@ public final class PharmaIntegrity implements ContractInterface {
         ChaincodeStub stub = ctx.getStub();
         DrugTruth asset = ReadAsset(ctx, batchNumber);
 
-        // Validation
         if (qrHash == null || qrHash.isEmpty()) {
             throw new ChaincodeException("QR hash cannot be empty", "INVALID_INPUT");
         }
-
         if (!qrHash.matches("^[0-9a-fA-F]{64}$")) {
             throw new ChaincodeException("QR hash must be 64-char hex (SHA256)", "INVALID_HASH_FORMAT");
         }
-
-        // Check if already has QR hash
         if (asset.getQrHash() != null && !asset.getQrHash().isEmpty()) {
             throw new ChaincodeException("Batch already has QR hash attached", "QR_ALREADY_EXISTS");
         }
 
-        // Attach QR hash and confirm
         asset.setQrHash(qrHash);
         asset.setStatus("CONFIRMED");
 
         stub.putStringState(batchNumber, genson.serialize(asset));
 
-        // Emit event
         QRHashAttachedEvent event = new QRHashAttachedEvent();
         event.batchNumber = batchNumber;
         event.qrHash = qrHash;
@@ -289,10 +170,6 @@ public final class PharmaIntegrity implements ContractInterface {
         return asset;
     }
 
-    /**
-     * Transfer custody with quantity tracking.
-     * Aligned with chain_of_custody_events table.
-     */
     @Transaction(intent = Transaction.TYPE.SUBMIT)
     public DrugTruth TransferCustody(final Context ctx,
                                      final String batchNumber,
@@ -305,23 +182,19 @@ public final class PharmaIntegrity implements ContractInterface {
         ChaincodeStub stub = ctx.getStub();
         DrugTruth asset = ReadAsset(ctx, batchNumber);
 
-        // Validation
         if (fromParticipantUuid == null || toParticipantUuid == null) {
             throw new ChaincodeException("Participant UUIDs cannot be null", "INVALID_INPUT");
         }
-
         if (quantity <= 0) {
             throw new ChaincodeException("Quantity must be positive", "INVALID_QUANTITY");
         }
 
-        // Update custody
         asset.setCurrentOwner(toParticipantMspId);
         asset.setCurrentOwnerUuid(toParticipantUuid);
         asset.setStatus("IN_TRANSIT_" + eventType);
 
         stub.putStringState(batchNumber, genson.serialize(asset));
 
-        // Emit event
         CustodyEvent event = new CustodyEvent();
         event.batchNumber = batchNumber;
         event.fromParticipantUuid = fromParticipantUuid;
@@ -337,10 +210,6 @@ public final class PharmaIntegrity implements ContractInterface {
         return asset;
     }
 
-    /**
-     * Record lab inspection.
-     * Aligned with regulatory_scrutiny table.
-     */
     @Transaction(intent = Transaction.TYPE.SUBMIT)
     public DrugTruth RecordScrutiny(final Context ctx,
                                     final String batchNumber,
@@ -351,7 +220,6 @@ public final class PharmaIntegrity implements ContractInterface {
         ChaincodeStub stub = ctx.getStub();
         DrugTruth asset = ReadAsset(ctx, batchNumber);
 
-        // Update status based on test result
         String statusPrefix = testResult.equals("PASSED") ? "QA_PASSED" :
                 testResult.equals("FAILED") ? "QA_FAILED" : "QA_PENDING";
 
@@ -359,7 +227,6 @@ public final class PharmaIntegrity implements ContractInterface {
 
         stub.putStringState(batchNumber, genson.serialize(asset));
 
-        // Emit event
         ScrutinyEvent event = new ScrutinyEvent();
         event.batchNumber = batchNumber;
         event.testResult = testResult;
@@ -374,9 +241,6 @@ public final class PharmaIntegrity implements ContractInterface {
         return asset;
     }
 
-    /**
-     * Record dispensing to patient.
-     */
     @Transaction(intent = Transaction.TYPE.SUBMIT)
     public DrugTruth DispenseBatch(final Context ctx,
                                    final String batchNumber,
@@ -390,7 +254,6 @@ public final class PharmaIntegrity implements ContractInterface {
         if (pharmacyUuid == null || pharmacyUuid.isEmpty()) {
             throw new ChaincodeException("Pharmacy UUID required", "INVALID_INPUT");
         }
-
         if (quantity <= 0) {
             throw new ChaincodeException("Quantity must be positive", "INVALID_QUANTITY");
         }
@@ -398,7 +261,6 @@ public final class PharmaIntegrity implements ContractInterface {
         asset.setStatus("DISPENSED");
         stub.putStringState(batchNumber, genson.serialize(asset));
 
-        // Emit event
         DispenseEvent event = new DispenseEvent();
         event.batchNumber = batchNumber;
         event.pharmacyUuid = pharmacyUuid;
@@ -413,10 +275,6 @@ public final class PharmaIntegrity implements ContractInterface {
         return asset;
     }
 
-    /**
-     * Record a recall.
-     * Aligned with product_recalls table.
-     */
     @Transaction(intent = Transaction.TYPE.SUBMIT)
     public DrugTruth RecallBatch(final Context ctx,
                                  final String batchNumber,
@@ -431,7 +289,6 @@ public final class PharmaIntegrity implements ContractInterface {
         asset.setStatus("RECALLED");
         stub.putStringState(batchNumber, genson.serialize(asset));
 
-        // Emit event
         RecallEvent event = new RecallEvent();
         event.batchNumber = batchNumber;
         event.productId = productId;
@@ -447,9 +304,6 @@ public final class PharmaIntegrity implements ContractInterface {
         return asset;
     }
 
-    /**
-     * Generic status update.
-     */
     @Transaction(intent = Transaction.TYPE.SUBMIT)
     public DrugTruth UpdateStatus(final Context ctx,
                                   final String batchNumber,
@@ -484,52 +338,47 @@ public final class PharmaIntegrity implements ContractInterface {
         return (assetJSON != null && !assetJSON.isEmpty());
     }
 
-    /**
-     * Query by QR hash (for patient verification).
-     */
     @Transaction(intent = Transaction.TYPE.EVALUATE)
     public DrugTruth ReadAssetByQRHash(final Context ctx, final String qrHash) {
-        // This requires a CouchDB index in production
-        // For now, this is a placeholder - backend should query Postgres directly
         throw new ChaincodeException("Query by QR hash should be done via backend/Postgres", "USE_BACKEND_QUERY");
     }
 
     /**
-     * Get complete transaction history.
+     * FIXED:
+     * 1. Uses try-with-resources for Iterator
+     * 2. Uses for-each loop for KeyModification
+     * 3. Uses correct Timestamp handling
      */
     @Transaction(intent = Transaction.TYPE.EVALUATE)
     public String GetAssetHistory(final Context ctx, final String batchNumber) {
         ChaincodeStub stub = ctx.getStub();
 
-        var historyIterator = stub.getHistoryForKey(batchNumber);
+        try (QueryResultsIterator<KeyModification> historyIterator = stub.getHistoryForKey(batchNumber)) {
 
-        StringBuilder history = new StringBuilder("[");
-        boolean first = true;
+            StringBuilder history = new StringBuilder("[");
+            boolean first = true;
 
-        while (historyIterator.hasNext()) {
-            var modification = historyIterator.next();
+            for (KeyModification modification : historyIterator) {
+                if (!first) {
+                    history.append(",");
+                }
+                first = false;
 
-            if (!first) {
-                history.append(",");
+                history.append("{");
+                history.append("\"txId\":\"").append(modification.getTxId()).append("\",");
+                history.append("\"value\":").append(modification.getStringValue()).append(",");
+
+                // FIX: modification.getTimestamp() returns Instant, just use toString() for ISO format
+                history.append("\"timestamp\":\"").append(modification.getTimestamp().toString()).append("\",");
+
+                history.append("\"isDelete\":").append(modification.isDeleted());
+                history.append("}");
             }
-            first = false;
 
-            history.append("{");
-            history.append("\"txId\":\"").append(modification.getTxId()).append("\",");
-            history.append("\"value\":").append(modification.getStringValue()).append(",");
-            history.append("\"timestamp\":\"").append(
-                    Instant.ofEpochSecond(
-                            modification.getTimestamp().getSeconds(),
-                            modification.getTimestamp().getNanos()
-                    ).toString()
-            ).append("\",");
-            history.append("\"isDelete\":").append(modification.isDeleted());
-            history.append("}");
+            history.append("]");
+            return history.toString();
+        } catch (Exception e) {
+            throw new ChaincodeException("Failed to get asset history: " + e.getMessage());
         }
-
-        history.append("]");
-        historyIterator.close();
-
-        return history.toString();
     }
 }

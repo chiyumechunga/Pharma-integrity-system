@@ -1,9 +1,7 @@
 package com.chiyumechunga.backend.dto;
 
-import jakarta.validation.constraints.Future;
-import jakarta.validation.constraints.NotBlank;
-import jakarta.validation.constraints.NotNull;
-import jakarta.validation.constraints.Size;
+import jakarta.validation.constraints.*;
+
 import java.time.LocalDate;
 import java.util.UUID;
 
@@ -28,7 +26,8 @@ public record RegistryRequestDto(
         @Future(message = "Expiry date must be in the future")
         LocalDate expiryDate,
 
-        @NotBlank(message = "QR Hash is required")
-        @Size(min = 64, max = 64, message = "QR Hash must be a valid SHA-256 string (64 characters)")
-        String qrHash
+        @PastOrPresent(message = "Manufacturing date cannot be in the future")
+        LocalDate manufacturingDate
+
+
 ) {}

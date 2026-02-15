@@ -14,4 +14,13 @@ public interface PharmaceuticalRegistryRepository extends JpaRepository<Pharmace
     boolean existsByQrHash(String qrHash);
 
     long countByCurrentStatus(String confirmed);
+
+
+    Optional<PharmaceuticalRegistry> findByBatchNumber(String batchNumber); // NEW: For duplicate check
+
+
+    boolean existsByBatchNumber(String batchNumber); // NEW: Alternative duplicate check
+
+
+
 }

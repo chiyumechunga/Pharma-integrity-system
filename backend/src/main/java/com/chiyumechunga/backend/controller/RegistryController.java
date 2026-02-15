@@ -29,27 +29,25 @@ public class RegistryController {
     @PostMapping
     public ResponseEntity<FireflyAckDto> registerBatch(@Valid @RequestBody RegistryRequestDto request) {
         // 1. INPUT SANITIZATION (Keep this for Defense in Depth)
-        // We sanitize strictly to ensure the Service layer never receives dangerous chars.
+        // UPDATED: No qrHash field (backend generates it), added manufacturingDate
         RegistryRequestDto safeRequest = new RegistryRequestDto(
                 HtmlUtils.htmlEscape(request.productName()),
                 sanitizeStrict(request.batchNumber()),
                 request.manufacturerId(),
-                request.expiryDate(),
-                sanitizeStrict(request.qrHash())
+                request.manufacturingDate(), // ADDED: Pass through manufacturing date
+                request.expiryDate()
+                // REMOVED: qrHash - backend generates this
         );
 
         // 2. EXECUTE LOGIC
-        // The service returns a DTO that *might* contain user data (in the tool's view).
         FireflyAckDto serviceResponse = registryService.registerBatch(safeRequest);
 
-        // 3. BREAK THE TAINT CHAIN (The Security Fix)
-        // Instead of returning 'serviceResponse' directly; we construct a NEW response
-        // using ONLY the system-generated ID and hardcoded strings.
-        // This proves to the analyzer that User Input cannot possibly be in the output.
+        // 3. BREAK THE TAINT CHAIN (Security Fix)
+        // Return only system-generated data, not user input
         FireflyAckDto cleanResponse = new FireflyAckDto(
                 serviceResponse.operationId(), // SAFE: System-generated UUID from Firefly
-                "SUBMITTED",                   // SAFE: Hardcoded Constant
-                "Batch registration initiated successfully." // SAFE: Hardcoded Constant
+                serviceResponse.status(),      // SAFE: System-controlled status
+                "Batch registration initiated. QR hash will be generated after blockchain confirmation." // SAFE: Hardcoded
         );
 
         // 4. SECURITY HEADERS
