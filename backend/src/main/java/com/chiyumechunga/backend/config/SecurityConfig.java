@@ -20,7 +20,7 @@ import java.util.List;
 public class SecurityConfig {
 
     private final JwtAuthenticationFilter jwtAuthenticationFilter;
-    private final AuthenticationProvider authenticationProvider; // Injected from ApplicationConfig
+    private final AuthenticationProvider authenticationProvider;
 
     @Bean
     public SecurityFilterChain securityFilterChain(HttpSecurity http) throws Exception {
@@ -28,18 +28,25 @@ public class SecurityConfig {
                 .csrf(AbstractHttpConfigurer::disable)
                 .cors(cors -> cors.configurationSource(corsConfigurationSource()))
                 .authorizeHttpRequests(auth -> auth
+                        // Public Endpoints
                         .requestMatchers(
                                 "/api/v1/auth/**",
-                                "/api/v1/firefly/**", // IMPORTANT: Allows Firefly Webhooks to bypass login
+                                "/api/v1/firefly/**",
                                 "/api/v1/verification/**",
                                 "/api/v1/provenance/**",
                                 "/swagger-ui/**",
                                 "/v3/api-docs/**"
                         ).permitAll()
+
+                        // --- THE FIX: Explicitly allow MANUFACTURER for Registry ---
+                        // We use hasAuthority() because your token says "MANUFACTURER", not "ROLE_MANUFACTURER"
+                        .requestMatchers("/api/v1/registry/**").hasAuthority("MANUFACTURER")
+
+                        // All other endpoints require at least a valid login
                         .anyRequest().authenticated()
                 )
                 .sessionManagement(sess -> sess.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
-                .authenticationProvider(authenticationProvider) // Connects the logic
+                .authenticationProvider(authenticationProvider)
                 .addFilterBefore(jwtAuthenticationFilter, UsernamePasswordAuthenticationFilter.class);
 
         return http.build();

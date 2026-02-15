@@ -27,8 +27,8 @@ public class SupplyChainParticipant {
     private String participantName;
 
     // FIX FOR 'setRole' ERROR: Field name must match the setter (setRole -> role)
-    @Enumerated(EnumType.STRING)
-    @Column(name = "participant_type", nullable = false)
+    @Enumerated(EnumType.STRING)        // Tells Java: "The DB has a String (VARCHAR), convert it to my Enum"
+    @Column(name = "participant_type")  // Tells Java: "Look in the 'participant_type' column, NOT 'role'"
     private ParticipantType role;
 
     private String country;
