@@ -17,3 +17,5 @@ bin/
 # Ignore IntelliJ/IDE specific files
 *.iws
 *.ipr
+
+lib

@@ -33,30 +33,32 @@ public class AuthController {
     }
 
     @GetMapping("/me")
-    public ResponseEntity<?> getCurrentUser(Authentication authentication) {
-        if (authentication == null) {
-            return ResponseEntity.status(401).body("Not Authenticated");
+    public ResponseEntity<?> getCurrentUser(
+            Authentication authentication,
+            @AuthenticationPrincipal ProfileDetails userDetails
+    ) {
+        if (authentication == null || userDetails == null) {
+            return ResponseEntity.status(401).body(Map.of(
+                    "error", "Not Authenticated"
+            ));
         }
 
+        String username = authentication.getName();
+        var authorities = authentication.getAuthorities().stream()
+                .map(GrantedAuthority::getAuthority)
+                .collect(Collectors.toList());
+
+        UUID participantId = userDetails.getProfile().getParticipantId();
+        String country = userDetails.getProfile().getCountry();
+        String role = userDetails.getProfile().getRole().name();
+
         return ResponseEntity.ok(Map.of(
-                "username", authentication.getName(),
-                // This is the CRITICAL part. It lists exactly what permissions you have.
-                // If this list is empty, JwtAuthenticationFilter is broken.
-                // If it says "ROLE_MANUFACTURER", you need hasRole().
-                // If it says "MANUFACTURER", you need hasAuthority().
-                "authorities", authentication.getAuthorities().stream()
-                        .map(GrantedAuthority::getAuthority)
-                        .collect(Collectors.toList())
+                "username", username,
+                "authorities", authorities,
+                "participantId", participantId,
+                "country", country,
+                "role", role
         ));
     }
-    /* === ADD THIS NEW METHOD HERE ===
-    @GetMapping("/me")
-    public ResponseEntity<String> getCurrentUserProfile(@AuthenticationPrincipal ProfileDetails userDetails) {
-        // Direct access to the entity!
-        UUID myId = userDetails.getProfile().getParticipantId();
-        String myCountry = userDetails.getProfile().getCountry();
-        String myRole = userDetails.getProfile().getRole().name();
 
-        return ResponseEntity.ok("Authenticated as: " + myRole + " (ID: " + myId + ") from " + myCountry);
-    }*/
 }

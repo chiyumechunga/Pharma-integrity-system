@@ -11,7 +11,7 @@ import org.springframework.web.reactive.function.client.WebClient;
 public class FireflyConfig {
 
     @Value("${firefly.api.url}")
-    private String fireflyUrl; // e.g., http://localhost:7000
+    private String fireflyUrl; //
 
     @Value("${firefly.namespace}")
     private String namespace; // e.g., default

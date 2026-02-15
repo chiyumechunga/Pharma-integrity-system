@@ -16,52 +16,30 @@ public class FireflyNodeRouter {
     @Value("${firefly.namespace}")
     private String namespace;
 
-    // --- Injecting Node URLs from application.properties ---
-    @Value("${firefly.nodes.manufacturer}")
-    private String manufacturerNodeUrl;
+    // INJECTED: The single Supernode URL (http://127.0.0.1:5000)
+    // defined in application.properties as firefly.api.url
+    @Value("${firefly.api.url}")
+    private String fireflyApiUrl;
 
-    @Value("${firefly.nodes.zammsa}")
-    private String zammsaNodeUrl;
-
-    @Value("${firefly.nodes.pharmacy}")
-    private String pharmacyNodeUrl;
-
-    @Value("${firefly.nodes.zamra}")
-    private String zamraNodeUrl;
-
-    // Cache clients so we don't rebuild them every request
+    // Cache clients to maintain performance
     private final Map<ParticipantType, WebClient> nodeClients = new ConcurrentHashMap<>();
 
     /**
-     * Returns the connection to the SPECIFIC Firefly Node for this user role.
+     * Returns the connection to the Firefly Supernode.
+     * * NOTE: We preserve the 'ParticipantType' argument to keep your Service layer
+     * compatible, but inside here, we route EVERYONE to the same
+     * single-node gateway (Port 5000).
      */
     public WebClient getClientForRole(ParticipantType role) {
-        return nodeClients.computeIfAbsent(role, this::buildClient);
+        return nodeClients.computeIfAbsent(role, k -> buildClient());
     }
 
-    private WebClient buildClient(ParticipantType role) {
-        String baseUrl;
-
-        // MAP ROLES TO INJECTED PROPERTIES
-        switch (role) {
-            case MANUFACTURER:
-                baseUrl = manufacturerNodeUrl;
-                break;
-            case ZAMMSA: // Distributor
-                baseUrl = zammsaNodeUrl;
-                break;
-            case PHARMACY:
-                baseUrl = pharmacyNodeUrl;
-                break;
-            case ZAMRA: // Regulator
-                baseUrl = zamraNodeUrl;
-                break;
-            default:
-                throw new IllegalArgumentException("No Firefly Node configured for role: " + role);
-        }
+    private WebClient buildClient() {
+        // Construct the full URL: http://127.0.0.1:5000/api/v1/namespaces/default
+        String fullUrl = fireflyApiUrl + "/api/v1/namespaces/" + namespace;
 
         return WebClient.builder()
-                .baseUrl(baseUrl + "/api/v1/namespaces/" + namespace)
+                .baseUrl(fullUrl)
                 .defaultHeader(HttpHeaders.CONTENT_TYPE, MediaType.APPLICATION_JSON_VALUE)
                 .build();
     }

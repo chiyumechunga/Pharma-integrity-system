@@ -11,7 +11,7 @@ import org.springframework.lang.NonNull;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.security.core.userdetails.UserDetails;
-import org.springframework.security.core.userdetails.UserDetailsService;
+import org.springframework.security.core.userdetails.UserDetailsService; // Import this!
 import org.springframework.security.web.authentication.WebAuthenticationDetailsSource;
 import org.springframework.stereotype.Component;
 import org.springframework.util.StringUtils;
@@ -25,7 +25,7 @@ import java.io.IOException;
 public class JwtAuthenticationFilter extends OncePerRequestFilter {
 
     private final JwtUtils jwtUtils;
-    private final UserDetailsService userDetailsService; // <--- INJECT THIS
+    private final UserDetailsService userDetailsService; // <--- 1. Inject this
 
     @Override
     protected void doFilterInternal(
@@ -39,20 +39,18 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
             if (jwt != null && jwtUtils.validateJwtToken(jwt)) {
                 String username = jwtUtils.getUserNameFromJwtToken(jwt);
 
-                // 1. Load the User Details (this fetches roles from DB via ProfileDetails)
+                // 2. Load the User from DB (This fixes the "userDetails not found" error)
                 UserDetails userDetails = userDetailsService.loadUserByUsername(username);
 
-                // 2. Create the Auth Token with AUTHORITIES
-                // CRITICAL FIX: The 3rd argument 'userDetails.getAuthorities()' is what gives you permission!
+                // 3. Create Authentication with AUTHORITIES (This fixes the 403 Forbidden error)
                 UsernamePasswordAuthenticationToken authentication = new UsernamePasswordAuthenticationToken(
                         userDetails,
                         null,
-                        userDetails.getAuthorities()
+                        userDetails.getAuthorities() // <--- CRITICAL: Passes roles to Security Context
                 );
 
                 authentication.setDetails(new WebAuthenticationDetailsSource().buildDetails(request));
 
-                // 3. Set the context
                 SecurityContextHolder.getContext().setAuthentication(authentication);
             }
         } catch (Exception e) {
