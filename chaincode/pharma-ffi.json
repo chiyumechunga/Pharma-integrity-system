@@ -1,0 +1,193 @@
+{
+  "name": "pharma-integrity",
+  "version": "1.0",
+  "description": "Full API mapping for Pharmaceutical Integrity Ledger",
+  "methods": [
+    {
+      "name": "CreateAsset",
+      "pathname": "",
+      "description": "Registers a new drug batch",
+      "params": [
+        { "name": "batchNumber", "schema": { "type": "string" } },
+        { "name": "productId", "schema": { "type": "string" } },
+        { "name": "productName", "schema": { "type": "string" } },
+        { "name": "manufacturerId", "schema": { "type": "string" } },
+        { "name": "manufacturerMspId", "schema": { "type": "string" } },
+        { "name": "manufacturingDate", "schema": { "type": "string" } },
+        { "name": "expiryDate", "schema": { "type": "string" } }
+      ],
+      "returns": [ { "name": "asset", "schema": { "type": "object" } } ]
+    },
+    {
+      "name": "AttachQRHash",
+      "pathname": "",
+      "description": "Attaches a generated QR hash to an existing batch",
+      "params": [
+        { "name": "batchNumber", "schema": { "type": "string" } },
+        { "name": "qrHash", "schema": { "type": "string" } },
+        { "name": "registryId", "schema": { "type": "string" } }
+      ],
+      "returns": [ { "name": "asset", "schema": { "type": "object" } } ]
+    },
+    {
+      "name": "TransferCustody",
+      "pathname": "",
+      "description": "Transfers drug custody between supply chain participants",
+      "params": [
+        { "name": "batchNumber", "schema": { "type": "string" } },
+        { "name": "fromParticipantUuid", "schema": { "type": "string" } },
+        { "name": "toParticipantUuid", "schema": { "type": "string" } },
+        { "name": "toParticipantMspId", "schema": { "type": "string" } },
+        { "name": "eventType", "schema": { "type": "string" } },
+        { "name": "quantity", "schema": { "type": "integer" } }
+      ],
+      "returns": [ { "name": "asset", "schema": { "type": "object" } } ]
+    },
+    {
+      "name": "RecordScrutiny",
+      "pathname": "",
+      "description": "Records lab inspection results",
+      "params": [
+        { "name": "batchNumber", "schema": { "type": "string" } },
+        { "name": "inspectorUuid", "schema": { "type": "string" } },
+        { "name": "testResult", "schema": { "type": "string" } },
+        { "name": "labNotes", "schema": { "type": "string" } }
+      ],
+      "returns": [ { "name": "asset", "schema": { "type": "object" } } ]
+    },
+    {
+      "name": "DispenseBatch",
+      "pathname": "",
+      "description": "Records the dispensing of a drug to a patient",
+      "params": [
+        { "name": "batchNumber", "schema": { "type": "string" } },
+        { "name": "pharmacyUuid", "schema": { "type": "string" } },
+        { "name": "patientId", "schema": { "type": "string" } },
+        { "name": "quantity", "schema": { "type": "integer" } }
+      ],
+      "returns": [ { "name": "asset", "schema": { "type": "object" } } ]
+    },
+    {
+      "name": "RecallBatch",
+      "pathname": "",
+      "description": "Initiates a drug recall",
+      "params": [
+        { "name": "batchNumber", "schema": { "type": "string" } },
+        { "name": "productId", "schema": { "type": "string" } },
+        { "name": "regulatorUuid", "schema": { "type": "string" } },
+        { "name": "recallReason", "schema": { "type": "string" } },
+        { "name": "severityLevel", "schema": { "type": "string" } }
+      ],
+      "returns": [ { "name": "asset", "schema": { "type": "object" } } ]
+    },
+    {
+      "name": "UpdateStatus",
+      "pathname": "",
+      "params": [
+        { "name": "batchNumber", "schema": { "type": "string" } },
+        { "name": "newStatus", "schema": { "type": "string" } },
+        { "name": "updatedByUuid", "schema": { "type": "string" } }
+      ],
+      "returns": [ { "name": "asset", "schema": { "type": "object" } } ]
+    },
+    {
+      "name": "ReadAsset",
+      "pathname": "",
+      "params": [
+        { "name": "batchNumber", "schema": { "type": "string" } }
+      ],
+      "returns": [ { "name": "asset", "schema": { "type": "object" } } ]
+    },
+    {
+      "name": "AssetExists",
+      "pathname": "",
+      "params": [
+        { "name": "batchNumber", "schema": { "type": "string" } }
+      ],
+      "returns": [ { "name": "exists", "schema": { "type": "boolean" } } ]
+    },
+    {
+      "name": "GetAssetHistory",
+      "pathname": "",
+      "params": [
+        { "name": "batchNumber", "schema": { "type": "string" } }
+      ],
+      "returns": [ { "name": "history", "schema": { "type": "string" } } ]
+    }
+  ],
+  "events": [
+    {
+      "name": "DrugManufactured",
+      "description": "Emitted when a new batch is created",
+      "params": [
+        { "name": "batchNumber", "schema": { "type": "string" } },
+        { "name": "productId", "schema": { "type": "string" } },
+        { "name": "productName", "schema": { "type": "string" } },
+        { "name": "manufacturerId", "schema": { "type": "string" } },
+        { "name": "manufacturingDate", "schema": { "type": "string" } },
+        { "name": "expiryDate", "schema": { "type": "string" } },
+        { "name": "txId", "schema": { "type": "string" } },
+        { "name": "invokedByMsp", "schema": { "type": "string" } }
+      ]
+    },
+    {
+      "name": "QRHashAttached",
+      "params": [
+        { "name": "batchNumber", "schema": { "type": "string" } },
+        { "name": "qrHash", "schema": { "type": "string" } },
+        { "name": "registryId", "schema": { "type": "string" } },
+        { "name": "txId", "schema": { "type": "string" } }
+      ]
+    },
+    {
+      "name": "CustodyTransferred",
+      "params": [
+        { "name": "batchNumber", "schema": { "type": "string" } },
+        { "name": "fromParticipantUuid", "schema": { "type": "string" } },
+        { "name": "toParticipantUuid", "schema": { "type": "string" } },
+        { "name": "eventType", "schema": { "type": "string" } },
+        { "name": "quantity", "schema": { "type": "integer" } },
+        { "name": "txId", "schema": { "type": "string" } },
+        { "name": "timestamp", "schema": { "type": "string" } },
+        { "name": "invokedByMsp", "schema": { "type": "string" } }
+      ]
+    },
+    {
+      "name": "LabScrutinyCompleted",
+      "params": [
+        { "name": "batchNumber", "schema": { "type": "string" } },
+        { "name": "testResult", "schema": { "type": "string" } },
+        { "name": "labNotes", "schema": { "type": "string" } },
+        { "name": "inspectorUuid", "schema": { "type": "string" } },
+        { "name": "txId", "schema": { "type": "string" } },
+        { "name": "timestamp", "schema": { "type": "string" } },
+        { "name": "invokedByMsp", "schema": { "type": "string" } }
+      ]
+    },
+    {
+      "name": "DrugRecalled",
+      "params": [
+        { "name": "batchNumber", "schema": { "type": "string" } },
+        { "name": "productId", "schema": { "type": "string" } },
+        { "name": "recallReason", "schema": { "type": "string" } },
+        { "name": "severityLevel", "schema": { "type": "string" } },
+        { "name": "recalledByUuid", "schema": { "type": "string" } },
+        { "name": "txId", "schema": { "type": "string" } },
+        { "name": "timestamp", "schema": { "type": "string" } },
+        { "name": "invokedByMsp", "schema": { "type": "string" } }
+      ]
+    },
+    {
+      "name": "DrugDispensed",
+      "params": [
+        { "name": "batchNumber", "schema": { "type": "string" } },
+        { "name": "pharmacyUuid", "schema": { "type": "string" } },
+        { "name": "patientId", "schema": { "type": "string" } },
+        { "name": "quantity", "schema": { "type": "integer" } },
+        { "name": "txId", "schema": { "type": "string" } },
+        { "name": "timestamp", "schema": { "type": "string" } },
+        { "name": "invokedByMsp", "schema": { "type": "string" } }
+      ]
+    }
+  ]
+}

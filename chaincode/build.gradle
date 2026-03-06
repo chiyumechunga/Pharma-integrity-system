@@ -1,42 +1,54 @@
 plugins {
-    id 'com.github.johnrengelman.shadow' version '8.1.1'
+    id 'com.gradleup.shadow' version '9.3.1'
     id 'java'
+    id 'application'
 }
 
 group = 'com.chiyumechunga.chaincode'
 version = '0.0.1-SNAPSHOT'
 
 java {
-    sourceCompatibility = JavaVersion.VERSION_11
-    targetCompatibility = JavaVersion.VERSION_11
+    sourceCompatibility = JavaVersion.VERSION_21
+    targetCompatibility = JavaVersion.VERSION_21
+}
+
+application {
+    mainClass = 'org.hyperledger.fabric.contract.ContractRouter'
 }
 
 repositories {
     mavenCentral()
     maven {
-        url "https://jitpack.io"
+        url = uri("https://jitpack.io")
     }
     maven {
-        url "https://hyperledger.jfrog.io/hyperledger/fabric-maven"
+        url = uri("https://hyperledger.jfrog.io/hyperledger/fabric-maven")
     }
 }
 
 dependencies {
+    // Fabric Chaincode
     implementation 'org.hyperledger.fabric-chaincode-java:fabric-chaincode-shim:2.5.2'
+    annotationProcessor 'org.hyperledger.fabric-chaincode-java:fabric-chaincode-shim:2.5.2'
+
+    // JSON Processing
     implementation 'com.owlike:genson:1.6'
     implementation 'org.json:json:20240303'
 
+    // Testing - FIXED: Added junit-platform-launcher
     testImplementation 'org.junit.jupiter:junit-jupiter:5.10.2'
+    testRuntimeOnly 'org.junit.platform:junit-platform-launcher'
+
     testImplementation 'org.assertj:assertj-core:3.25.3'
     testImplementation 'org.mockito:mockito-core:5.11.0'
 }
 
 shadowJar {
-    archiveBaseName.set('chaincode')
-    archiveVersion.set('')
-    archiveClassifier.set('')
+    // FIXED: Modern property assignment syntax
+    archiveBaseName = 'chaincode'
+    archiveVersion = ''
+    archiveClassifier = ''
 
-    // Critical for Fabric to discover contract implementations
     mergeServiceFiles()
 
     manifest {
@@ -45,17 +57,15 @@ shadowJar {
         )
     }
 
-    // Exclude signature files that can cause issues
-    exclude 'META-INF/*.SF'
-    exclude 'META-INF/*.DSA'
-    exclude 'META-INF/*.RSA'
+    exclude 'META-INF/*.SF', 'META-INF/*.DSA', 'META-INF/*.RSA'
 }
 
 test {
     useJUnitPlatform()
     testLogging {
-        events "passed", "skipped", "failed"
-        exceptionFormat "full"
+        // FIXED: Assignment syntax for Gradle 9.3+
+        events = ["passed", "skipped", "failed"]
+        exceptionFormat = "full"
         showStandardStreams = false
     }
 }
@@ -69,5 +79,14 @@ tasks.withType(JavaCompile).configureEach {
     ])
 }
 
-// Make shadowJar the default build artifact
+// Ensure the shadowJar is built during the standard assemble task
 assemble.dependsOn shadowJar
+
+// Force BouncyCastle version consistency
+configurations.all {
+    resolutionStrategy.eachDependency { details ->
+        if (details.requested.group == 'org.bouncycastle') {
+            details.useVersion '1.78.1'
+        }
+    }
+}
