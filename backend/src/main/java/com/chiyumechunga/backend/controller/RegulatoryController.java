@@ -9,10 +9,7 @@ import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
-import org.springframework.web.bind.annotation.PostMapping;
-import org.springframework.web.bind.annotation.RequestBody;
-import org.springframework.web.bind.annotation.RequestMapping;
-import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.bind.annotation.*;
 import org.springframework.web.util.HtmlUtils;
 
 @Slf4j
@@ -26,11 +23,11 @@ public class RegulatoryController {
         this.regulatoryService = regulatoryService;
     }
 
-    @PostMapping("/inspections")
+    // 1. CREATE SCRUTINY EVENT (Renamed from /inspections)
+    @PostMapping("/scrutiny")
     public ResponseEntity<FireflyAckDto> submitInspection(@Valid @RequestBody LabInspectionRequestDto request) {
         log.info("Received Lab Inspection. Sanitizing inputs...");
 
-        // 1. STRICT SANITIZATION
         LabInspectionRequestDto safeRequest = new LabInspectionRequestDto(
                 request.registryId(),
                 request.inspectorId(),
@@ -38,21 +35,26 @@ public class RegulatoryController {
                 HtmlUtils.htmlEscape(request.labNotes())
         );
 
-        // 2. PROCESS - FIXED: Changed method name to match Interface
         FireflyAckDto serviceResponse = regulatoryService.recordLabInspection(safeRequest);
 
-        // 3. BREAK TAINT CHAIN
-        FireflyAckDto cleanResponse = new FireflyAckDto(
-                serviceResponse.operationId(),
-                "PROCESSING",
-                "Inspection data queued for blockchain."
-        );
-
-        // 4. SECURITY HEADERS
         HttpHeaders headers = new HttpHeaders();
         headers.add("X-Content-Type-Options", "nosniff");
         headers.setContentType(MediaType.APPLICATION_JSON);
 
-        return new ResponseEntity<>(cleanResponse, headers, HttpStatus.ACCEPTED);
+        return new ResponseEntity<>(serviceResponse, headers, HttpStatus.ACCEPTED);
+    }
+
+    // 2. GET SCRUTINY EVENT DETAILS (Not Implemented - Missing Service Method)
+    @GetMapping("/scrutiny/{id}")
+    public ResponseEntity<?> getInspection(@PathVariable String id) {
+        return ResponseEntity.status(HttpStatus.NOT_IMPLEMENTED)
+                .body("TODO: Implement regulatoryService.getInspectionById(id).");
+    }
+
+    // 3. LIST ALL RECALLS (Not Implemented - Missing Service Method)
+    @GetMapping("/recalls")
+    public ResponseEntity<?> listRecalls() {
+        return ResponseEntity.status(HttpStatus.NOT_IMPLEMENTED)
+                .body("TODO: Implement regulatoryService.getAllRecalls().");
     }
 }

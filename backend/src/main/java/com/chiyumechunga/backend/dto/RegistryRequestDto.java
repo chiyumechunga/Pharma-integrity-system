@@ -22,12 +22,11 @@ public record RegistryRequestDto(
         @NotNull(message = "Manufacturer ID is required")
         UUID manufacturerId,
 
+        @PastOrPresent(message = "Manufacturing date cannot be in the future")
+        LocalDate manufacturingDate,
+
         @NotNull(message = "Expiry date is required")
         @Future(message = "Expiry date must be in the future")
-        LocalDate expiryDate,
-
-        @PastOrPresent(message = "Manufacturing date cannot be in the future")
-        LocalDate manufacturingDate
-
+        LocalDate expiryDate
 
 ) {}

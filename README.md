@@ -36,19 +36,19 @@ FireFly events drive dual writes to PostgreSQL for read-optimized queries.
 
 ### Core Components
 
-**🔗 Chaincode Implementation**  
+**Chaincode Implementation** 
 Chaincode governs pharmaceutical lifecycle: `RegisterBatch`, `TransferCustody`, `QualityCheckpoint`, `DispenseBatch`. Emits Fabric events consumed by FireFly.
 
-**⚡ FireFly Middleware**
+**FireFly Middleware**
 - REST APIs for chaincode invoke/query
 - WebSocket event streaming
 - FFI contract interfaces
 - Event-driven dual writes 
 
-**🌐 REST API Layer**  
+**REST API Layer**
 Spring Boot endpoints abstract FireFly operations for stakeholders.
 
-**💾 Database Infrastructure**  
+**Database Infrastructure**
 PostgreSQL stores user data, metadata, and event projections.
 
 ## Event-Driven Dual Write Architecture
@@ -76,8 +76,8 @@ Hyperledger FireFly CLI
 ```
 Quick Start with Fabric Supernode
 ```bash
-ff init fabric pis
-ff start pis
+ff init fabric capstone
+ff start capstone
 ```
 
 ## Academic Context
@@ -94,17 +94,17 @@ Developed as partial fulfillment of undergraduate capstone requirements at **Mul
 
 ## Author Information
 
-**Chiyume Chunga**  
-*Bachelor of Science in Information Technology*  
+**Chiyume Chunga**
+**Bachelor of Science in Information Technology**
 **Mulungushi University, Zambia**
 
-**Contact:**  
-📧 chiyumechunga@gmail.com  
+**Contact:** 
+📧 chiyumechunga@gmail.com 
 💼 [linkedin.com/in/chiyume-chunga](https://linkedin.com/in/chiyume-chunga) 
 
 ## Acknowledgments
 
-- **Supervisor**: Dr. Sinyinda Muwanei, PhD
+- **Supervisor**: Dr. Sinyinda Muwanei, Ph.D.
 - **Hyperledger FireFly & Fabric** communities
 - **Mulungushi University**
 

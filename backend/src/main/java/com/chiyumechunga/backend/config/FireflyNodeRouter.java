@@ -21,6 +21,9 @@ public class FireflyNodeRouter {
     @Value("${firefly.api.url}")
     private String fireflyApiUrl;
 
+    @Value("${firefly.api.name}")       // ← add this
+    private String apiName;
+
     // Cache clients to maintain performance
     private final Map<ParticipantType, WebClient> nodeClients = new ConcurrentHashMap<>();
 
@@ -35,8 +38,9 @@ public class FireflyNodeRouter {
     }
 
     private WebClient buildClient() {
-        // Construct the full URL: http://127.0.0.1:5000/api/v1/namespaces/default
-        String fullUrl = fireflyApiUrl + "/api/v1/namespaces/" + namespace;
+        String fullUrl = fireflyApiUrl
+                + "/api/v1/namespaces/" + namespace
+                + "/apis/" + apiName;
 
         return WebClient.builder()
                 .baseUrl(fullUrl)

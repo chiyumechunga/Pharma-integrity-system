@@ -26,17 +26,17 @@ public class FireflyWebhookController {
      */
     @PostMapping("/firefly")
     public ResponseEntity<Void> receiveBlockchainEvent(@RequestBody FireflyEventDto event) {
-        log.info("🔔 Webhook Received: Event ID {}", event.id());
+        log.info(" Webhook Received: Event ID {}", event.id());
 
         try {
             // 1. Attempt to process the event immediately
             eventService.processBlockchainEvent(event);
 
-            log.info("✅ Event processed successfully.");
+            log.info(" Event processed successfully.");
             return ResponseEntity.ok().build();
 
         } catch (Exception e) {
-            log.error("❌ Error processing event {}. Saving to Dead Letter Queue.", event.id(), e);
+            log.error(" Error processing event {}. Saving to Dead Letter Queue.", event.id(), e);
 
             // 2. THE FIX: Persist failure to DB instead of throwing 500
             saveToDeadLetterQueue(event, e.getMessage());
@@ -63,10 +63,10 @@ public class FireflyWebhookController {
             failedEvent.setRetryCount(0);
 
             failedEventRepo.save(failedEvent);
-            log.info("💾 Saved Event {} to FailedEventRepository.", event.id());
+            log.info(" Saved Event {} to FailedEventRepository.", event.id());
 
         } catch (JsonProcessingException jsonEx) {
-            log.error("💥 Critical Failure: Could not serialize event to JSON for saving.", jsonEx);
+            log.error(" Critical Failure: Could not serialize event to JSON for saving.", jsonEx);
             // In this rare case, we might want to return 500 to keep Firefly trying,
             // or just log it if we can't save it at all.
         }
