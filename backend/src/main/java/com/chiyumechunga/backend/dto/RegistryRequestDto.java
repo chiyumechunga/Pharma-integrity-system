@@ -1,19 +1,43 @@
 package com.chiyumechunga.backend.dto;
 
-import jakarta.validation.constraints.*;
+import jakarta.validation.constraints.Future;
+import jakarta.validation.constraints.NotBlank;
+import jakarta.validation.constraints.NotNull;
+import jakarta.validation.constraints.PastOrPresent;
+import jakarta.validation.constraints.Size;
 
 import java.time.LocalDate;
 import java.util.UUID;
 
 /**
- * DTO for incoming batch registration requests.
- * Uses Jakarta Validation to enforce business rules at the API entry point.
+ * Request DTO for creating a batch in pharmaceutical_registry.
+ *
+ * Important design rule:
+ * This DTO no longer contains productName as free text.
+ * The product name must come from product_master.generic_name after productId is resolved.
+ * That prevents inconsistent naming between the catalog and registered batches.
+ *
+ * Caller supplies only the fields needed to create a batch:
+ *   product_id
+ *   batch_number
+ *   manufacturer_id
+ *   manufacturing_date
+ *   expiry_date
+ *
+ * System/database managed values are deliberately excluded:
+ *   registry_id
+ *   qr_hash
+ *   firefly_id
+ *   blockchain_tx_id
+ *   current_status
+ *   confirmed_at
+ *   created_at
+ *   product_name (resolved from product_master)
  */
 public record RegistryRequestDto(
 
-        @NotBlank(message = "Product name is required")
-        @Size(min = 2, max = 255, message = "Product name must be between 2 and 255 characters")
-        String productName,
+        @NotNull(message = "Product ID is required")
+        UUID productId,
 
         @NotBlank(message = "Batch number is required")
         @Size(max = 100, message = "Batch number cannot exceed 100 characters")
