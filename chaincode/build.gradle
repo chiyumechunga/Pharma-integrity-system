@@ -34,6 +34,7 @@ dependencies {
     // JSON Processing
     implementation 'com.owlike:genson:1.6'
     implementation 'org.json:json:20240303'
+    implementation 'com.google.code.gson:gson:2.10.1'
 
     // Testing - FIXED: Added junit-platform-launcher
     testImplementation 'org.junit.jupiter:junit-jupiter:5.10.2'
