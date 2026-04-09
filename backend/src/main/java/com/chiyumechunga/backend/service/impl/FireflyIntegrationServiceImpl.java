@@ -3,6 +3,7 @@ package com.chiyumechunga.backend.service.impl;
 import com.chiyumechunga.backend.config.FireflyNodeRouter;
 import com.chiyumechunga.backend.model.ParticipantType;
 import com.chiyumechunga.backend.service.FireflyIntegrationService;
+import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
@@ -17,8 +18,7 @@ public class FireflyIntegrationServiceImpl implements FireflyIntegrationService 
     private final FireflyNodeRouter nodeRouter;
     private final ObjectMapper objectMapper;
 
-    public FireflyIntegrationServiceImpl(FireflyNodeRouter nodeRouter,
-                                         ObjectMapper objectMapper) {
+    public FireflyIntegrationServiceImpl(FireflyNodeRouter nodeRouter, ObjectMapper objectMapper) {
         this.nodeRouter = nodeRouter;
         this.objectMapper = objectMapper;
     }
@@ -28,7 +28,22 @@ public class FireflyIntegrationServiceImpl implements FireflyIntegrationService 
         log.info("Invoking '{}' as role: {}", functionName, currentUserRole);
 
         WebClient client = nodeRouter.getClientForRole(currentUserRole);
-        Map<String, Object> inputData = objectMapper.convertValue(payload, Map.class);
+        Map<String, Object> inputData;
+
+        try {
+            // Align with our optimized FFI (FireFly Interface) architecture
+            if ("CreateAsset".equals(functionName) || "SubmitTestResult".equals(functionName)) {
+                // These methods expect a single stringified JSON parameter called 'payloadJSON'
+                String stringifiedJson = objectMapper.writeValueAsString(payload);
+                inputData = Map.of("payloadJSON", stringifiedJson);
+            } else {
+                // Methods like TransferCustody expect individual mapped parameters
+                inputData = objectMapper.convertValue(payload, Map.class);
+            }
+        } catch (JsonProcessingException e) {
+            log.error("Failed to stringify payload for FireFly: {}", e.getMessage());
+            throw new RuntimeException("JSON processing error for FireFly integration", e);
+        }
 
         // FireFly requires payload wrapped under "input" key
         Map<String, Object> fireflyBody = Map.of("input", inputData);
@@ -41,6 +56,4 @@ public class FireflyIntegrationServiceImpl implements FireflyIntegrationService 
                 .doOnError(e -> log.error("FireFly invoke failed: {}", e.getMessage()))
                 .block();
     }
-
-
 }

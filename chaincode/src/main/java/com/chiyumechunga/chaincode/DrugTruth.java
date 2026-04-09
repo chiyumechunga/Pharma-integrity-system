@@ -106,8 +106,5 @@ public class DrugTruth {
                 Objects.equals(currentStatus, drugTruth.currentStatus);
     }
 
-    @Override
-    public int hashCode() {
-        return Objects.hash(docType, qrHash, batchNumber, productId, productName, manufacturerId, expiryDate, currentStatus, requiresColdChain, approvedByZamra);
-    }
+
 }

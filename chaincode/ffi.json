@@ -1,0 +1,56 @@
+{
+  "namespace": "default",
+  "name": "pharmaintegrity",
+  "version": "1.0",
+  "description": "Aligned with Spring Boot Backend and Chaincode",
+  "methods": [
+    {
+      "name": "CreateAsset",
+      "params": [
+        { "name": "payloadJSON", "schema": { "type": "string" } }
+      ],
+      "returns": []
+    },
+    {
+      "name": "TransferCustody",
+      "params": [
+        { "name": "qrHash", "schema": { "type": "string" } },
+        { "name": "fromId", "schema": { "type": "string" } },
+        { "name": "toId", "schema": { "type": "string" } },
+        { "name": "eventType", "schema": { "type": "string" } },
+        { "name": "quantity", "schema": { "type": "integer" } }
+      ],
+      "returns": []
+    },
+    {
+      "name": "SubmitTestResult",
+      "params": [
+        { "name": "payloadJSON", "schema": { "type": "string" } }
+      ],
+      "returns": []
+    },
+    {
+      "name": "GetAssetHistory",
+      "params": [
+        { "name": "qrHash", "schema": { "type": "string" } }
+      ],
+      "returns": [
+        { "name": "history", "schema": { "type": "array", "items": { "type": "string" } } }
+      ]
+    }
+  ],
+  "events": [
+    {
+      "name": "AssetCreated",
+      "params": [{ "name": "data", "schema": { "type": "object" } }]
+    },
+    {
+      "name": "CustodyTransferred",
+      "params": [{ "name": "data", "schema": { "type": "object" } }]
+    },
+    {
+      "name": "TestResultSubmitted",
+      "params": [{ "name": "data", "schema": { "type": "object" } }]
+    }
+  ]
+}
