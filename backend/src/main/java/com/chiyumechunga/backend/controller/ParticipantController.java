@@ -41,7 +41,8 @@ public class ParticipantController {
                 request.participantType(),
                 HtmlUtils.htmlEscape(request.country()),
                 sanitizeStrict(request.blockchainEnrollmentId()),
-                request.password() // Pass raw password to Service for BCrypt hashing
+                request.email(), // ADD THIS LINE
+                request.password()
         );
 
         SupplyChainParticipant newParticipant = participantService.registerParticipant(safeRequest);

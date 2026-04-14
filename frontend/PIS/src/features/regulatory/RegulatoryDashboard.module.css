@@ -1,0 +1,342 @@
+/* src/features/regulatory/RegulatoryDashboard.module.css */
+
+.container {
+    max-width: 1200px;
+    margin: 0 auto;
+    padding: 32px 24px;
+    display: grid;
+    grid-template-columns: 1fr 320px; /* Asymmetrical Layout: Main Content + Sidebar */
+    gap: 32px;
+    align-items: start;
+}
+
+@media (max-width: 800px) {
+    .container {
+        grid-template-columns: 1fr;
+    }
+}
+
+/* Header Section */
+.header {
+    grid-column: 1 / -1;
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-end;
+    margin-bottom: 24px;
+}
+
+.title {
+    font-size: 32px;
+    font-weight: 700;
+    color: var(--primary);
+    letter-spacing: -0.02em;
+}
+
+.subtitle {
+    font-family: var(--font-ui);
+    color: var(--on-surface-variant);
+    font-size: 14px;
+}
+
+.userProfile {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    font-family: var(--font-ui);
+    font-weight: 600;
+    font-size: 14px;
+}
+
+/* Metrics Grid */
+.metricsGrid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+    gap: 24px;
+    margin-bottom: 40px;
+}
+
+.metricCard {
+    background: white;
+    border-radius: var(--radius-xl);
+    padding: 24px;
+    box-shadow: 0 4px 20px rgba(0, 70, 85, 0.04);
+    position: relative;
+    overflow: hidden;
+}
+
+.metricCard::after {
+    content: '';
+    position: absolute;
+    bottom: 0;
+    left: 0;
+    width: 100%;
+    height: 4px;
+    background-color: var(--primary-container);
+}
+
+.metricValue {
+    font-size: 36px;
+    font-weight: 700;
+    color: var(--primary);
+    margin-top: 8px;
+}
+
+.metricLabel {
+    font-family: var(--font-ui);
+    font-size: 13px;
+    color: var(--on-surface-variant);
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+}
+
+.warningText {
+    color: #d62828; /* Status Recalled / Danger */
+}
+
+/* Emergency Recall Zone (Danger UI) */
+.dangerZone {
+    background: #fff5f5;
+    border: 1px solid rgba(214, 40, 40, 0.15);
+    border-radius: var(--radius-xl);
+    padding: 32px;
+    margin-bottom: 40px;
+}
+
+.dangerHeader {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    color: #d62828;
+    margin-bottom: 16px;
+}
+
+.dangerHeader h2 {
+    font-size: 20px;
+    font-weight: 700;
+}
+
+.dangerDescription {
+    font-family: var(--font-ui);
+    font-size: 14px;
+    color: var(--on-surface-variant);
+    margin-bottom: 24px;
+    max-width: 600px;
+    line-height: 1.5;
+}
+
+.recallForm {
+    display: flex;
+    gap: 16px;
+}
+
+.inputWrapper {
+    flex: 1;
+    max-width: 400px;
+}
+
+.input {
+    width: 100%;
+    background: white;
+    border: 1px solid rgba(214, 40, 40, 0.2);
+    border-radius: var(--radius-lg);
+    padding: 16px;
+    font-family: var(--font-ui);
+    font-size: 16px;
+    outline: none;
+    transition: all 0.2s;
+}
+
+.input:focus {
+    border-color: #d62828;
+    box-shadow: 0 0 0 3px rgba(214, 40, 40, 0.1);
+}
+
+.recallBtn {
+    background-color: #d62828;
+    color: white;
+    border: none;
+    border-radius: var(--radius-lg);
+    padding: 0 32px;
+    font-family: var(--font-ui);
+    font-weight: 600;
+    font-size: 14px;
+    cursor: pointer;
+    transition: background-color 0.2s;
+}
+
+.recallBtn:hover {
+    background-color: #b02020;
+}
+
+/* Live Network Alerts (Sidebar) */
+.alertsPanel {
+    background: white;
+    border-radius: var(--radius-xl);
+    padding: 24px;
+    box-shadow: 0 4px 24px rgba(0, 70, 85, 0.03);
+}
+
+.alertsHeader {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 24px;
+}
+
+.alertsHeader h3 {
+    font-size: 16px;
+    color: var(--primary);
+}
+
+.pulseDot {
+    width: 8px;
+    height: 8px;
+    background-color: var(--primary-container);
+    border-radius: 50%;
+    animation: pulse 2s infinite;
+}
+
+@keyframes pulse {
+    0% { box-shadow: 0 0 0 0 rgba(0, 95, 115, 0.4); }
+    70% { box-shadow: 0 0 0 6px rgba(0, 95, 115, 0); }
+    100% { box-shadow: 0 0 0 0 rgba(0, 95, 115, 0); }
+}
+
+/* Timeline Implementation (No-Line Rule exception: vertical connector) */
+.timelineItem {
+    display: flex;
+    gap: 16px;
+    margin-bottom: 24px;
+    position: relative;
+}
+
+.timelineConnector {
+    position: absolute;
+    left: 3px;
+    top: 24px;
+    bottom: -24px;
+    width: 2px;
+    background-color: var(--surface-container-high);
+}
+
+.timelineDot {
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    background-color: var(--primary-container);
+    margin-top: 6px;
+    position: relative;
+    z-index: 2;
+}
+
+.timelineDotAlert {
+    background-color: #d62828;
+}
+
+.timelineContent h4 {
+    font-size: 13px;
+    font-weight: 600;
+    margin-bottom: 2px;
+}
+
+.timelineContent p {
+    font-family: var(--font-ui);
+    font-size: 11px;
+    color: var(--on-surface-variant);
+}
+
+/* Logout Button */
+.logoutBtn {
+    background: transparent;
+    border: none;
+    color: var(--on-surface-variant);
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 8px;
+    border-radius: 50%;
+    transition: all 0.2s ease;
+}
+
+.logoutBtn:hover {
+    background-color: rgba(214, 40, 40, 0.1);
+    color: #d62828; /* Transforms to warning red on hover */
+}
+
+/* Lab Inspection Zone */
+.labZone {
+    background: white;
+    border: 1px solid var(--border);
+    border-radius: var(--radius-xl);
+    padding: 32px;
+    margin-bottom: 40px;
+    box-shadow: 0 4px 20px rgba(0, 70, 85, 0.04);
+}
+
+.labHeader {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    color: var(--primary);
+    margin-bottom: 16px;
+}
+
+.labHeader h2 {
+    font-size: 20px;
+    font-weight: 700;
+}
+
+.labDescription {
+    font-family: var(--font-ui);
+    font-size: 14px;
+    color: var(--on-surface-variant);
+    margin-bottom: 24px;
+    line-height: 1.5;
+}
+
+.formRow {
+    display: flex;
+    gap: 16px;
+    margin-bottom: 16px;
+}
+
+@media (max-width: 600px) {
+    .formRow {
+        flex-direction: column;
+    }
+}
+
+.labBtn {
+    background-color: var(--primary-container);
+    color: white;
+    border: none;
+    border-radius: var(--radius-lg);
+    padding: 14px 32px;
+    font-family: var(--font-ui);
+    font-weight: 600;
+    font-size: 14px;
+    cursor: pointer;
+    transition: background-color 0.2s;
+    align-self: flex-start;
+}
+
+.labBtn:hover {
+    background-color: var(--secondary);
+}
+
+.labBtn:disabled {
+    background-color: var(--surface-container-high);
+    color: var(--on-surface-variant);
+    cursor: not-allowed;
+}
+
+/* Ensure select inputs match standard inputs */
+select.input {
+    appearance: none;
+    background-image: url("data:image/svg+xml;charset=US-ASCII,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20width%3D%2224%22%20height%3D%2224%22%20viewBox%3D%220%200%2024%2024%22%20fill%3D%22none%22%20stroke%3D%22%236f797c%22%20stroke-width%3D%222%22%20stroke-linecap%3D%22round%22%20stroke-linejoin%3D%22round%22%3E%3Cpolyline%20points%3D%226%209%2012%2015%2018%209%22%3E%3C%2Fpolyline%3E%3C%2Fsvg%3E");
+    background-repeat: no-repeat;
+    background-position: right 16px center;
+    background-size: 16px;
+    cursor: pointer;
+}

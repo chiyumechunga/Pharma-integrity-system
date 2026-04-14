@@ -1,0 +1,46 @@
+/* src/index.css */
+@import url('https://fonts.googleapis.com/css2?family=Public+Sans:wght@400;600;700&family=Inter:wght@400;500;600&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@24,400,0,0');
+
+:root {
+  /* Clinical Curator Palette */
+  --primary: #004655;
+  --primary-container: #005f73;
+  --primary-light: rgba(0, 70, 85, 0.1);
+  --secondary: #00696c;
+
+  --surface: #f7faf9;
+  --surface-variant: #eef2f1;
+  --surface-container-high: #dce4e2;
+
+  --on-surface: #181c1c;
+  --on-surface-variant: #6f797c;
+
+  --warning: #b38e00;
+  --warning-bg: #fffbe6;
+
+  --border: #dce4e2;
+  --status-passed: #2a9d8f;
+
+  --radius-lg: 16px;
+  --radius-xl: 24px;
+  --font-heading: 'Public Sans', system-ui, sans-serif;
+  --font-ui: 'Inter', system-ui, sans-serif;
+}
+
+* {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+body {
+  font-family: var(--font-heading);
+  background-color: var(--surface);
+  color: var(--on-surface);
+  -webkit-font-smoothing: antialiased;
+}
+
+.material-symbols-outlined {
+  font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24;
+}

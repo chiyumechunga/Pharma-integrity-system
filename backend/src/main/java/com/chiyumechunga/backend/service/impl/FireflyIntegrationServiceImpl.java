@@ -33,7 +33,6 @@ public class FireflyIntegrationServiceImpl implements FireflyIntegrationService 
         try {
             // Align with our optimized FFI (FireFly Interface) architecture
             if ("CreateAsset".equals(functionName) || "SubmitTestResult".equals(functionName)) {
-                // These methods expect a single stringified JSON parameter called 'payloadJSON'
                 String stringifiedJson = objectMapper.writeValueAsString(payload);
                 inputData = Map.of("payloadJSON", stringifiedJson);
             } else {

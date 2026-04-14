@@ -42,6 +42,7 @@ public class ParticipantServiceImpl implements ParticipantService {
         participant.setParticipantName(request.participantName());
         participant.setCountry(request.country());
         participant.setBlockchainEnrollmentId(request.blockchainEnrollmentId());
+        participant.setEmail(request.email());
 
         // 3. Set Defaults & Security
         // CORRECT: Use the existing field name from your DTO
