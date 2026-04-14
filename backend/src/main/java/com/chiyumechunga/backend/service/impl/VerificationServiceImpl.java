@@ -27,36 +27,35 @@ public class VerificationServiceImpl implements VerificationService {
         this.notificationService = notificationService;
     }
 
+    // VerificationServiceImpl.java
     @Override
     public VerificationResponseDto verifyProduct(String qrHash, String deviceFingerprint, String geo) {
-        // 1. QUERY
         PharmaceuticalRegistry product = registryRepository.findByQrHash(qrHash)
                 .orElseThrow(() -> new ResourceNotFoundException("Product not found with QR: " + qrHash));
 
-        // 2. CHECK STATUS
-        // We assume the product is valid only if its status matches the expected "ON_CHAIN" state.
-        boolean isValid = "ON_CHAIN".equals(product.getCurrentStatus());
+        // FIX: Use DDL-compliant status and check expiry
+        boolean isConfirmed = "CONFIRMED".equals(product.getCurrentStatus());
+        boolean isNotExpired = product.getExpiryDate().isAfter(java.time.LocalDate.now());
+        boolean isValid = isConfirmed && isNotExpired;
 
-        // 3. SECURITY ALERT (If fake/invalid)
-        if (!isValid) { // <--- FIX: Use the 'isValid' variable calculated above
-            log.warn("Suspicious scan detected for QR: {}", qrHash);
-            notificationService.sendAdminAlert(
-                    "Counterfeit/Invalid Drug Detected! QR: " + qrHash, // <--- FIX: Use 'qrHash' parameter directly
-                    "HIGH"
-            );
+        if (!isValid) {
+            String alertReason = !isNotExpired ? "Expired Drug" : "Counterfeit/Invalid Status";
+            log.warn("Suspicious scan detected for QR: {}. Reason: {}", qrHash, alertReason);
+            notificationService.sendAdminAlert(alertReason + " Detected! QR: " + qrHash, "HIGH");
         }
 
-        // 4. LOG SCAN (Delegated to AuditService to ensure @Async works)
         auditService.logScanAsync(product, deviceFingerprint, geo, isValid ? "AUTHENTIC" : "SUSPICIOUS");
 
-        // 5. RETURN
+        String responseMessage = isValid ? "Verified Authentic" :
+                (!isNotExpired ? "Warning: Product is Expired." : "Invalid Status: Product may be counterfeit.");
+
         return new VerificationResponseDto(
                 product.getProductName(),
                 product.getCurrentStatus(),
                 product.getBlockchainTxId(),
                 isValid,
-                isValid ? "Verified Authentic" : "Invalid Status: Product may be counterfeit or expired.",
-                null // extraNotes can be null
+                responseMessage,
+                null
         );
     }
 }

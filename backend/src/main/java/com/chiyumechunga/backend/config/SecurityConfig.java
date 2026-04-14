@@ -29,10 +29,11 @@ public class SecurityConfig {
                 .cors(cors -> cors.configurationSource(corsConfigurationSource()))
                 .authorizeHttpRequests(auth -> auth
                         // Public Endpoints
+                        // SecurityConfig.java
                         .requestMatchers(
                                 "/api/v1/auth/**",
                                 "/api/v1/firefly/**",
-                                "/api/v1/verification/**",
+                                "/api/v1/verifications/**", // Plural to match Controller
                                 "/api/v1/provenance/**",
                                 "/swagger-ui/**",
                                 "/v3/api-docs/**"
