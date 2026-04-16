@@ -19,26 +19,25 @@ public class ChainOfCustodyEvent {
     @Column(name = "event_id")
     private UUID eventId;
 
-    // RELATIONSHIP: Many events belong to One Product
+    // FIX: Changed variable name from "product" to "registry".
+    // Lombok @Data will now automatically create setRegistry() and getRegistry().
     @ManyToOne
     @JoinColumn(name = "registry_id", nullable = false)
-    private PharmaceuticalRegistry product;
+    private PharmaceuticalRegistry registry;
 
-    // RELATIONSHIP: The participant SENDING the product (Can be null if it's the Manufacturer creation event)
     @ManyToOne
     @JoinColumn(name = "from_participant_id")
     private SupplyChainParticipant fromParticipant;
 
-    // RELATIONSHIP: The participant RECEIVING the product
     @ManyToOne
     @JoinColumn(name = "to_participant_id", nullable = false)
     private SupplyChainParticipant toParticipant;
 
     @Column(name = "event_type", nullable = false)
-    private String eventType; // e.g., "MANUFACTURED", "SHIPPED", "RECEIVED", "DISPENSED"
+    private String eventType;
 
     @Column(name = "blockchain_tx_id", nullable = false)
-    private String blockchainTxId; // The immutable proof from Hyperledger Firefly
+    private String blockchainTxId;
 
     @CreationTimestamp
     @Column(name = "event_timestamp", updatable = false)
@@ -46,6 +45,5 @@ public class ChainOfCustodyEvent {
 
     @Column(name = "quantity")
     private Integer quantity;
-
 
 }

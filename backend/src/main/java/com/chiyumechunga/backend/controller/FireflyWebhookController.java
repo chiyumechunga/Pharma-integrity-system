@@ -13,7 +13,7 @@ import org.springframework.web.bind.annotation.*;
 
 @Slf4j
 @RestController
-@RequestMapping("/api/v1/webhooks")
+@RequestMapping("/api/v1/firefly")
 @RequiredArgsConstructor
 public class FireflyWebhookController {
 
@@ -24,7 +24,7 @@ public class FireflyWebhookController {
     /**
      * Entry point for all Blockchain Events (Webhooks from Firefly).
      */
-    @PostMapping("/firefly")
+    @PostMapping("/webhook")
     public ResponseEntity<Void> receiveBlockchainEvent(@RequestBody FireflyEventDto event) {
         log.info(" Webhook Received: Event ID {}", event.id());
 

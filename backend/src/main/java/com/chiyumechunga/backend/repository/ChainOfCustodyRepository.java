@@ -11,8 +11,8 @@ import java.util.UUID;
 public interface ChainOfCustodyRepository extends JpaRepository<ChainOfCustodyEvent, UUID> {
 
     // It tells JPA: "Join with the Product table, filter by QR Hash, and sort by Time"
-    List<ChainOfCustodyEvent> findByProduct_QrHashOrderByEventTimestampAsc(String qrHash);
+    List<ChainOfCustodyEvent> findByRegistry_QrHashOrderByEventTimestampAsc(String qrHash);
 
     // (Optional) Helper for statistics if you used it elsewhere
-    long countByProduct_RegistryId(UUID registryId);
+    long countByRegistry_RegistryId(UUID registryId);
 }

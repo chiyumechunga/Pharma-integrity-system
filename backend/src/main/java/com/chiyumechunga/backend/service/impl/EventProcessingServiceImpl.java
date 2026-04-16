@@ -1,20 +1,16 @@
 package com.chiyumechunga.backend.service.impl;
 
+import com.chiyumechunga.backend.dto.firefly.AssetData;
 import com.chiyumechunga.backend.dto.firefly.FireflyEventDto;
-import com.chiyumechunga.backend.model.EventCheckpoint;
-import com.chiyumechunga.backend.model.FailedEvent;
-import com.chiyumechunga.backend.model.PharmaceuticalRegistry;
-import com.chiyumechunga.backend.model.SupplyChainParticipant;
-import com.chiyumechunga.backend.repository.EventCheckpointRepository;
-import com.chiyumechunga.backend.repository.FailedEventRepository;
-import com.chiyumechunga.backend.repository.PharmaceuticalRegistryRepository;
-import com.chiyumechunga.backend.repository.SupplyChainParticipantRepository;
+import com.chiyumechunga.backend.model.*;
+import com.chiyumechunga.backend.repository.*;
 import com.chiyumechunga.backend.service.EventProcessingService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.time.ZonedDateTime;
 import java.util.Optional;
 import java.util.UUID;
 
@@ -25,8 +21,16 @@ public class EventProcessingServiceImpl implements EventProcessingService {
 
     private final PharmaceuticalRegistryRepository registryRepo;
     private final SupplyChainParticipantRepository participantRepo;
+    private final ChainOfCustodyRepository custodyRepo;
     private final EventCheckpointRepository checkpointRepo;
     private final FailedEventRepository failedEventRepo;
+
+    private String mapBlockchainStatus(String incomingStatus) {
+        if (incomingStatus == null || "ON_CHAIN".equals(incomingStatus)) {
+            return "CONFIRMED";
+        }
+        return incomingStatus;
+    }
 
     @Override
     @Transactional
@@ -34,88 +38,134 @@ public class EventProcessingServiceImpl implements EventProcessingService {
         UUID eventId = event.id();
         log.info("Processing Firefly Event ID: {}", eventId);
 
-        if (event.output() == null || event.output().data() == null) {
+        // FIX: Check inside the blockchainEvent object
+        if (event.blockchainEvent() == null || event.blockchainEvent().output() == null) {
             log.warn("Received empty event payload. Ignoring.");
             return;
         }
 
-        // Idempotency: Have we processed this exact FireFly event before?
+        // Idempotency Check
         if (checkpointRepo.existsById(eventId.toString())) {
             log.info("Event {} already processed. Skipping.", eventId);
             return;
         }
 
         try {
-            var data = event.output().data();
-            String qrHash = data.qrHash();
-            String eventType = event.type(); // Usually "AssetCreated", "CustodyTransferred", etc.
+            String eventName = event.blockchainEvent().name();
 
-            // 1. THE BRIDGE: Connect the Webhook to the RegistryServiceImpl
-            Optional<PharmaceuticalRegistry> existingRecordOpt = registryRepo.findByQrHash(qrHash);
+            // FIX: Extract data from inside the blockchainEvent object
+            var data = event.blockchainEvent().output();
 
-            if (existingRecordOpt.isPresent()) {
-                PharmaceuticalRegistry existing = existingRecordOpt.get();
-
-                // If the record was created by RegistryServiceImpl and is waiting for blockchain confirmation
-                if ("PENDING_BLOCKCHAIN".equals(existing.getCurrentStatus()) ||
-                        "PENDING_CONFIRMATION".equals(existing.getCurrentStatus())) {
-
-                    log.info("Pending batch {} found. Upgrading status to ON_CHAIN.", data.batchNumber());
-
-                    existing.setCurrentStatus("ON_CHAIN");
-                    if (event.transaction() != null) {
-                        existing.setBlockchainTxId(event.transaction().id());
-                    }
-                    existing.setFireflyId(eventId);
-
-                    registryRepo.save(existing);
-                    log.info(" Successfully confirmed Batch {} on the blockchain.", data.batchNumber());
-                } else {
-                    log.info("Batch with QR Hash {} already exists and is in status {}. Skipping creation.",
-                            qrHash, existing.getCurrentStatus());
-                }
-            } else {
-                // 2. FALLBACK: If the asset was created on a different FireFly node and we are just hearing about it
-                log.info("New asset detected from network. Projecting Asset {} to Database.", data.batchNumber());
-
-                UUID manufacturerUuid = data.manufacturerId();
-                SupplyChainParticipant manufacturer = participantRepo.findById(manufacturerUuid)
-                        .orElseThrow(() -> new RuntimeException("Manufacturer not found with ID: " + manufacturerUuid));
-
-                PharmaceuticalRegistry entity = new PharmaceuticalRegistry();
-                entity.setQrHash(qrHash);
-                entity.setProductName(data.productName());
-                entity.setBatchNumber(data.batchNumber());
-                entity.setManufacturer(manufacturer);
-                entity.setExpiryDate(data.expiryDate());
-                entity.setFireflyId(eventId);
-
-                if (event.transaction() != null) {
-                    entity.setBlockchainTxId(event.transaction().id());
-                }
-
-                entity.setCurrentStatus("ON_CHAIN");
-                registryRepo.save(entity);
-                log.info(" Successfully synchronized external Batch {} to local database.", data.batchNumber());
+            switch (eventName) {
+                case "AssetCreated":
+                    handleAssetCreated(eventId, data, event);
+                    break;
+                case "CustodyTransferred":
+                    handleCustodyTransferred(eventId, data, event);
+                    break;
+                default:
+                    log.warn("Unknown blockchain event name: {}. Ignoring payload.", eventName);
             }
 
-            // 3. Mark event as completed to prevent duplicate processing
             saveCheckpoint(eventId.toString(), event.sequence());
 
         } catch (Exception e) {
             log.error("Failed to process blockchain event {}", eventId, e);
 
-            // 4. Dead Letter Queue Integration
             FailedEvent failure = new FailedEvent();
             failure.setTxId(event.transaction() != null ? event.transaction().id() : "UNKNOWN");
             failure.setRawPayload(event.toString());
             failure.setErrorMessage(e.getMessage());
             failedEventRepo.save(failure);
 
-            // Re-throw to let the controller handle it if needed, or let it be swallowed
-            // since the controller already has a DLQ catch block.
             throw new RuntimeException("Event processing failed, routed to DLQ", e);
         }
+    }
+
+    private void handleAssetCreated(UUID eventId, AssetData data, FireflyEventDto event) {
+        String qrHash = data.qrHash();
+        String finalStatus = mapBlockchainStatus(data.currentStatus());
+
+        Optional<PharmaceuticalRegistry> existingRecordOpt = registryRepo.findByQrHash(qrHash);
+
+        if (existingRecordOpt.isPresent()) {
+            PharmaceuticalRegistry existing = existingRecordOpt.get();
+
+            if ("PENDING_BLOCKCHAIN".equals(existing.getCurrentStatus()) ||
+                    "PENDING_CONFIRMATION".equals(existing.getCurrentStatus())) {
+
+                existing.setCurrentStatus(finalStatus);
+                existing.setConfirmedAt(ZonedDateTime.now().toLocalDateTime());
+
+                if (event.transaction() != null) {
+                    existing.setBlockchainTxId(event.transaction().id());
+                }
+                existing.setFireflyId(eventId);
+                registryRepo.save(existing);
+                log.info("Successfully confirmed Batch {} on the blockchain.", data.batchNumber());
+            }
+        } else {
+            UUID manufacturerUuid = data.manufacturerId();
+            SupplyChainParticipant manufacturer = participantRepo.findById(manufacturerUuid)
+                    .orElseThrow(() -> new RuntimeException("Manufacturer not found: " + manufacturerUuid));
+
+            PharmaceuticalRegistry entity = new PharmaceuticalRegistry();
+            entity.setQrHash(qrHash);
+            entity.setProductName(data.productName());
+            entity.setBatchNumber(data.batchNumber());
+            entity.setManufacturer(manufacturer);
+            entity.setExpiryDate(data.expiryDate());
+            entity.setFireflyId(eventId);
+
+            if (event.transaction() != null) {
+                entity.setBlockchainTxId(event.transaction().id());
+            }
+
+            entity.setCurrentStatus(finalStatus);
+            entity.setConfirmedAt(ZonedDateTime.now().toLocalDateTime());
+            registryRepo.save(entity);
+            log.info("Successfully synchronized external Batch {} to local database.", data.batchNumber());
+        }
+    }
+
+    private void handleCustodyTransferred(UUID eventId, AssetData data, FireflyEventDto event) {
+        String qrHash = data.qrHash();
+
+        PharmaceuticalRegistry registry = registryRepo.findByQrHash(qrHash)
+                .orElseThrow(() -> new RuntimeException("Cannot transfer custody. Asset not found for QR: " + qrHash));
+
+        SupplyChainParticipant fromParticipant = participantRepo.findById(data.fromParticipantId())
+                .orElseThrow(() -> new RuntimeException("Sender not found: " + data.fromParticipantId()));
+
+        SupplyChainParticipant toParticipant = participantRepo.findById(data.toParticipantId())
+                .orElseThrow(() -> new RuntimeException("Receiver not found: " + data.toParticipantId()));
+
+        ChainOfCustodyEvent custodyEvent = new ChainOfCustodyEvent();
+
+        // This will now work because we fixed the model class below!
+        custodyEvent.setRegistry(registry);
+
+        custodyEvent.setFromParticipant(fromParticipant);
+        custodyEvent.setToParticipant(toParticipant);
+        custodyEvent.setEventType(data.eventType());
+        custodyEvent.setQuantity(data.quantity());
+
+        if (event.transaction() != null) {
+            custodyEvent.setBlockchainTxId(event.transaction().id());
+        } else {
+            custodyEvent.setBlockchainTxId(data.txId());
+        }
+
+        custodyRepo.save(custodyEvent);
+
+        if ("DISPENSED".equals(data.eventType()) || "DESTROYED".equals(data.eventType())) {
+            registry.setCurrentStatus(data.eventType());
+            registryRepo.save(registry);
+        }
+
+        // Syntax error cleanly fixed here
+        log.info("Successfully recorded custody transfer {} for QR {}. Sender: {}, Receiver: {}",
+                data.eventType(), qrHash, fromParticipant.getParticipantCode(), toParticipant.getParticipantCode());
     }
 
     private void saveCheckpoint(String eventId, String sequence) {

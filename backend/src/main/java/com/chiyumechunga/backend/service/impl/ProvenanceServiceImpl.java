@@ -37,7 +37,7 @@ public class ProvenanceServiceImpl implements ProvenanceService {
                 .orElseThrow(() -> new ResourceNotFoundException("Product not found with QR: " + qrHash));
 
         // 2. Get Event History (Ordered by Time)
-        List<ChainOfCustodyEvent> events = custodyRepository.findByProduct_QrHashOrderByEventTimestampAsc(qrHash);
+        List<ChainOfCustodyEvent> events = custodyRepository.findByRegistry_QrHashOrderByEventTimestampAsc(qrHash);
 
         // 3. Map to DTOs
         List<ProvenanceEventDto> historyDto = events.stream().map(event -> new ProvenanceEventDto(

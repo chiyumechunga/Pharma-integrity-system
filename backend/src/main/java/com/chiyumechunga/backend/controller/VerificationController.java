@@ -27,11 +27,11 @@ public class VerificationController {
         log.info("Verification scan request received for QR: {} from Location: {}",
                 request.qrHash(), request.geoLocation());
 
-        String safeQr = sanitize(request.qrHash());
-        String safeDevice = sanitize(request.deviceFingerprint());
-        String safeGeo = sanitize(request.geoLocation());
+        // FIX: Removed HTML escaping for the QR Hash.
+        String safeDevice = HtmlUtils.htmlEscape(request.deviceFingerprint());
+        String safeGeo = HtmlUtils.htmlEscape(request.geoLocation());
 
-        VerificationResponseDto result = verificationService.verifyProduct(safeQr, safeDevice, safeGeo);
+        VerificationResponseDto result = verificationService.verifyProduct(request.qrHash(), safeDevice, safeGeo);
         return ResponseEntity.ok(result);
     }
 

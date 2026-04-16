@@ -7,28 +7,53 @@ import java.util.UUID;
 
 /**
  * LOGIC: Data Mapping
- * This record defines the specific business data structure that the
- * Fabric Chaincode emits in the 'AssetCreated' event.
+ * This record defines the unified business data structure that the
+ * Fabric Chaincode emits for both 'AssetCreated' and 'CustodyTransferred' events.
  */
 @JsonIgnoreProperties(ignoreUnknown = true)
 public record AssetData(
 
-        // Maps JSON "qr_hash" -> Java "qrHash"
-        @JsonProperty("qr_hash")
+        // --- ASSET CREATED FIELDS ---
+        @JsonProperty("qrHash")
         String qrHash,
 
-        @JsonProperty("product_name")
+        @JsonProperty("productName")
         String productName,
 
-        @JsonProperty("batch_number")
+        @JsonProperty("batchNumber")
         String batchNumber,
 
-        // We keep this as String here to avoid deserialization errors.
-        // The Service layer will convert it to UUID.
-        @JsonProperty("manufacturer_id")
+        @JsonProperty("manufacturerId")
         UUID manufacturerId,
 
-        // Jackson will automatically parse ISO-8601 strings (e.g., "2026-12-31") into LocalDate
-        @JsonProperty("expiry_date")
-        LocalDate expiryDate
+        @JsonProperty("expiryDate")
+        LocalDate expiryDate,
+
+        @JsonProperty("currentStatus")
+        String currentStatus,
+
+        @JsonProperty("productId")
+        String productId,
+
+        @JsonProperty("requiresColdChain")
+        Boolean requiresColdChain,
+
+        @JsonProperty("approvedByZamra")
+        Boolean approvedByZamra,
+
+        // --- CUSTODY TRANSFERRED FIELDS ---
+        @JsonProperty("fromParticipantId")
+        UUID fromParticipantId,
+
+        @JsonProperty("toParticipantId")
+        UUID toParticipantId,
+
+        @JsonProperty("eventType")
+        String eventType,
+
+        @JsonProperty("quantity")
+        Integer quantity,
+
+        @JsonProperty("txId")
+        String txId
 ) {}

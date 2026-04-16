@@ -5,10 +5,12 @@ import com.chiyumechunga.backend.exception.ResourceNotFoundException;
 import com.chiyumechunga.backend.model.PharmaceuticalRegistry;
 import com.chiyumechunga.backend.repository.PharmaceuticalRegistryRepository;
 import com.chiyumechunga.backend.service.AuditService;
-import com.chiyumechunga.backend.service.NotificationService; // Import NotificationService
+import com.chiyumechunga.backend.service.NotificationService;
 import com.chiyumechunga.backend.service.VerificationService;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
+
+import java.time.LocalDate;
 
 @Slf4j
 @Service
@@ -16,42 +18,48 @@ public class VerificationServiceImpl implements VerificationService {
 
     private final PharmaceuticalRegistryRepository registryRepository;
     private final AuditService auditService;
-    private final NotificationService notificationService; // <--- ADD THIS FIELD
+    private final NotificationService notificationService;
 
-    // Inject all three services
     public VerificationServiceImpl(PharmaceuticalRegistryRepository registryRepository,
                                    AuditService auditService,
-                                   NotificationService notificationService) { // <--- ADD TO CONSTRUCTOR
+                                   NotificationService notificationService) {
         this.registryRepository = registryRepository;
         this.auditService = auditService;
         this.notificationService = notificationService;
     }
 
-    // VerificationServiceImpl.java
     @Override
     public VerificationResponseDto verifyProduct(String qrHash, String deviceFingerprint, String geo) {
         PharmaceuticalRegistry product = registryRepository.findByQrHash(qrHash)
                 .orElseThrow(() -> new ResourceNotFoundException("Product not found with QR: " + qrHash));
 
-        // FIX: Use DDL-compliant status and check expiry
-        boolean isConfirmed = "CONFIRMED".equals(product.getCurrentStatus());
-        boolean isNotExpired = product.getExpiryDate().isAfter(java.time.LocalDate.now());
-        boolean isValid = isConfirmed && isNotExpired;
+        // 1. FIX: Check against DDL-compliant states
+        String status = product.getCurrentStatus();
+        boolean isAuthenticState = "CONFIRMED".equals(status) || "DISPENSED".equals(status);
 
+        // 2. FIX: Ensure the drug isn't expired
+        boolean isNotExpired = product.getExpiryDate() != null && product.getExpiryDate().isAfter(LocalDate.now());
+
+        boolean isValid = isAuthenticState && isNotExpired;
+
+        // 3. SECURITY ALERT (Granular reporting)
         if (!isValid) {
-            String alertReason = !isNotExpired ? "Expired Drug" : "Counterfeit/Invalid Status";
+            String alertReason = !isNotExpired ? "Expired Drug" : "Invalid Status (" + status + ")";
             log.warn("Suspicious scan detected for QR: {}. Reason: {}", qrHash, alertReason);
-            notificationService.sendAdminAlert(alertReason + " Detected! QR: " + qrHash, "HIGH");
+            notificationService.sendAdminAlert(
+                    alertReason + " Detected! QR: " + qrHash,
+                    "HIGH"
+            );
         }
 
         auditService.logScanAsync(product, deviceFingerprint, geo, isValid ? "AUTHENTIC" : "SUSPICIOUS");
 
         String responseMessage = isValid ? "Verified Authentic" :
-                (!isNotExpired ? "Warning: Product is Expired." : "Invalid Status: Product may be counterfeit.");
+                (!isNotExpired ? "Warning: Product is Expired." : "Invalid Status: Product may be counterfeit or recalled.");
 
         return new VerificationResponseDto(
                 product.getProductName(),
-                product.getCurrentStatus(),
+                status,
                 product.getBlockchainTxId(),
                 isValid,
                 responseMessage,

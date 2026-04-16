@@ -13,5 +13,18 @@ public record FireflyEventDto(
         String type,
         String namespace,
         @JsonProperty("tx") TransactionInfo transaction,
-        EventOutput output
-) {}
+
+        // THE FIX: Parse the output directly into our unified payload model
+        //AssetData output,
+        // === THE FIX: Added the missing blockchainEvent metadata field ===
+        @JsonProperty("blockchainEvent")
+        BlockchainEventMetadata blockchainEvent
+) {
+    // Nested record to capture the name of the smart contract event
+    @JsonIgnoreProperties(ignoreUnknown = true)
+    public record BlockchainEventMetadata(
+            String id,
+            String name,
+            AssetData output
+    ) {}
+}
