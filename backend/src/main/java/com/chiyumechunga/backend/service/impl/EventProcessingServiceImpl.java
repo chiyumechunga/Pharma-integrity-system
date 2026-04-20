@@ -24,6 +24,7 @@ public class EventProcessingServiceImpl implements EventProcessingService {
     private final ChainOfCustodyRepository custodyRepo;
     private final EventCheckpointRepository checkpointRepo;
     private final FailedEventRepository failedEventRepo;
+    private final RegulatoryScrutinyRepository scrutinyRepo;
 
     private String mapBlockchainStatus(String incomingStatus) {
         if (incomingStatus == null || "ON_CHAIN".equals(incomingStatus)) {
@@ -173,5 +174,44 @@ public class EventProcessingServiceImpl implements EventProcessingService {
         checkpoint.setListenerId(eventId);
         checkpoint.setLastEventSequence(sequence);
         checkpointRepo.save(checkpoint);
+    }
+
+    // --- TEST RESULTS LOGIC (USING REGULATORY SCRUTINY) ---
+    private void handleTestResultsSubmitted(UUID eventId, AssetData data, FireflyEventDto event) {
+        String qrHash = data.qrHash();
+
+        PharmaceuticalRegistry registry = registryRepo.findByQrHash(qrHash)
+                .orElseThrow(() -> new RuntimeException("Cannot log test results. Asset not found for QR: " + qrHash));
+
+        // 1. Use your existing RegulatoryScrutiny model
+        RegulatoryScrutiny scrutiny = new RegulatoryScrutiny();
+        scrutiny.setRegistry(registry);
+        scrutiny.setScrutinyDate(java.time.LocalDate.now());
+
+        // Assuming data.currentStatus() string matches your TestResult Enum (e.g., "PASSED", "FAILED")
+        try {
+            scrutiny.setTestResult(com.chiyumechunga.backend.model.TestResult.valueOf(data.currentStatus()));
+        } catch (IllegalArgumentException e) {
+            log.warn("Could not map blockchain status '{}' to TestResult Enum.", data.currentStatus());
+        }
+
+        // Handle the transaction ID
+        if (event.transaction() != null) {
+            scrutiny.setBlockchainTxId(event.transaction().id());
+        } else {
+            scrutiny.setBlockchainTxId(data.txId() != null ? data.txId() : "UNKNOWN_TX");
+        }
+
+        // Note: inspectorId and labNotes might not be in the FireFly blockchain event payload.
+        // If they aren't, they will safely remain null, or you can fetch them if you update AssetData later!
+
+        scrutinyRepo.save(scrutiny);
+
+        // 2. Update the main Registry table so the whole system knows the batch passed/failed
+        registry.setCurrentStatus(data.currentStatus());
+        //registry.setApprovedByZamra("PASSED".equalsIgnoreCase(data.currentStatus()));
+        registryRepo.save(registry);
+
+        log.info("Successfully recorded Regulatory Scrutiny for QR {}. Status: {}", qrHash, data.currentStatus());
     }
 }
