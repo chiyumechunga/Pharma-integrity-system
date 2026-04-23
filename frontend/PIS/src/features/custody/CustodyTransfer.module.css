@@ -1,16 +1,17 @@
 /* src/features/custody/CustodyTransfer.module.css */
 
+/* 1. Responsive Container */
 .container {
-    max-width: 480px; /* Mobile-first container constraint */
+    max-width: 600px; /* Widened for a better tablet/desktop experience */
     margin: 0 auto;
     min-height: 100vh;
     padding-bottom: 100px;
     background-color: var(--surface);
 }
 
-/* Header & Sync Badge */
+/* 2. Header & Sync Badge */
 .header {
-    padding: 24px 24px 16px;
+    padding: 32px 24px 24px;
     position: sticky;
     top: 0;
     background: rgba(247, 250, 249, 0.9);
@@ -19,10 +20,12 @@
     display: flex;
     justify-content: space-between;
     align-items: flex-start;
+    border-bottom: 1px solid var(--border);
+    margin-bottom: 24px;
 }
 
 .title {
-    font-size: 24px;
+    font-size: 28px;
     font-weight: 700;
     letter-spacing: -0.02em;
     color: var(--primary);
@@ -35,156 +38,107 @@
     color: var(--on-surface-variant);
 }
 
-.syncBadge {
-    display: flex;
-    align-items: center;
-    gap: 6px;
-    background-color: var(--warning-bg);
-    border: 1px solid rgba(179, 142, 0, 0.2);
-    padding: 6px 12px;
-    border-radius: 999px;
-    color: var(--warning);
-}
-
-.syncIcon {
-    font-size: 14px;
-}
-
-.syncText {
-    font-family: var(--font-ui);
-    font-size: 11px;
-    font-weight: 600;
-}
-
-/* Action Cards */
+/* 3. Missing Form & Card Styles (This fixes your screenshot!) */
 .actionSection {
-    padding: 8px 24px;
+    padding: 0 24px;
+}
+
+.formCard {
+    background: white;
+    border: 1px solid var(--border);
+    border-radius: var(--radius-xl);
+    padding: 32px;
+    box-shadow: 0 8px 32px rgba(0, 70, 85, 0.04);
+}
+
+.inputGroup {
     display: flex;
     flex-direction: column;
-    gap: 16px;
+    gap: 8px;
+    margin-bottom: 20px;
 }
 
-.actionCard {
-    background: white;
-    border: 1px solid rgba(111, 121, 124, 0.15);
-    border-radius: var(--radius-xl);
-    padding: 24px;
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
+.label {
+    font-family: var(--font-ui);
+    font-size: 13px;
+    font-weight: 600;
+    color: var(--on-surface-variant);
+}
+
+.input, .select {
+    width: 100%;
+    padding: 14px 16px;
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    font-family: var(--font-ui);
+    font-size: 15px;
+    background-color: var(--surface);
+    color: var(--on-surface);
+    transition: border-color 0.2s, box-shadow 0.2s;
+}
+
+.input:focus, .select:focus {
+    outline: none;
+    border-color: var(--primary);
+    box-shadow: 0 0 0 3px var(--primary-light);
+}
+
+.select {
+    cursor: pointer;
+    appearance: none;
+    background-image: url("data:image/svg+xml;charset=US-ASCII,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20width%3D%2224%22%20height%3D%2224%22%20viewBox%3D%220%200%2024%2024%22%20fill%3D%22none%22%20stroke%3D%22%236f797c%22%20stroke-width%3D%222%22%20stroke-linecap%3D%22round%22%20stroke-linejoin%3D%22round%22%3E%3Cpolyline%20points%3D%226%209%2012%2015%2018%209%22%3E%3C%2Fpolyline%3E%3C%2Fsvg%3E");
+    background-repeat: no-repeat;
+    background-position: right 16px center;
+    background-size: 16px;
+}
+
+/* 4. Buttons */
+.btnPrimary {
+    background-color: var(--primary-container);
+    color: white;
+    border: none;
+    padding: 16px 32px;
+    border-radius: 999px;
+    font-family: var(--font-ui);
+    font-weight: 600;
+    font-size: 15px;
     cursor: pointer;
     transition: all 0.2s ease;
-    box-shadow: 0 4px 12px rgba(0, 70, 85, 0.03);
-}
-
-.actionCard:active {
-    transform: scale(0.98);
-}
-
-.actionCardPrimary {
-    border-bottom: 3px solid var(--primary-container);
-}
-
-.actionIconWrapper {
-    width: 48px;
-    height: 48px;
-    border-radius: 12px;
     display: flex;
     align-items: center;
     justify-content: center;
+    gap: 8px;
 }
 
-.bgPrimaryLight {
+.btnPrimary:hover:not(:disabled) {
+    background-color: var(--secondary);
+    transform: translateY(-1px);
+    box-shadow: 0 4px 12px rgba(0, 95, 115, 0.2);
+}
+
+.btnPrimary:disabled {
+    background-color: var(--surface-container-high);
+    color: var(--on-surface-variant);
+    cursor: not-allowed;
+}
+
+.btnScan {
     background-color: var(--primary-light);
     color: var(--primary-container);
-}
-
-.bgSurfaceVariant {
-    background-color: var(--surface-variant);
-    color: var(--on-surface-variant);
-}
-
-.actionText h3 {
-    font-size: 16px;
-    font-weight: 600;
-    margin-bottom: 2px;
-}
-
-.actionText p {
-    font-family: var(--font-ui);
-    font-size: 12px;
-    color: var(--on-surface-variant);
-}
-
-.chevron {
-    color: rgba(111, 121, 124, 0.4);
-}
-
-/* Recent Transfers List (The No-Line Rule) */
-.listSection {
-    padding: 24px;
-}
-
-.listHeader {
-    font-size: 16px;
-    font-weight: 600;
-    color: var(--primary);
-    margin-bottom: 24px;
-}
-
-.listItem {
+    border: none;
+    border-radius: 12px;
+    width: 64px;
     display: flex;
-    align-items: flex-start;
-    gap: 16px;
-    margin-bottom: 24px;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    transition: background-color 0.2s;
 }
 
-.statusIndicator {
-    width: 2px;
-    height: 40px;
-    background-color: var(--surface-container-high);
-    border-radius: 2px;
+.btnScan:hover {
+    background-color: rgba(0, 95, 115, 0.2);
 }
 
-.statusActive {
-    background-color: var(--primary-container);
-}
-
-.itemContent {
-    flex: 1;
-}
-
-.itemHeader {
-    display: flex;
-    justify-content: space-between;
-    align-items: flex-start;
-    margin-bottom: 4px;
-}
-
-.batchNumber {
-    font-family: var(--font-ui);
-    font-size: 14px;
-    font-weight: 600;
-}
-
-.time {
-    font-family: var(--font-ui);
-    font-size: 11px;
-    color: var(--on-surface-variant);
-}
-
-.itemDetails {
-    font-family: var(--font-ui);
-    font-size: 12px;
-    color: var(--on-surface-variant);
-}
-
-.statusText {
-    font-weight: 500;
-    color: var(--primary-container);
-}
-
-/* Logout Button */
 .logoutBtn {
     background: transparent;
     border: none;
@@ -200,5 +154,5 @@
 
 .logoutBtn:hover {
     background-color: rgba(214, 40, 40, 0.1);
-    color: #d62828; /* Transforms to warning red on hover */
+    color: #d62828;
 }

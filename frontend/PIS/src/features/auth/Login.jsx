@@ -28,9 +28,25 @@ export default function Login() {
         }
     });
 
-    const handleSubmit = (e) => {
+    // Inside Login.jsx onSubmit handler
+    const handleSubmit = async (e) => {
         e.preventDefault();
-        loginMutation.mutate(credentials);
+        try {
+            // POST /auth/login → returns { token, tokenType, participantId, role }
+            const { data } = await apiClient.post('auth/login', { email, password });
+            await login(data);              // AuthContext handles /auth/me fetch + state
+
+            // Redirect by role
+            const roleRoutes = {
+                MANUFACTURER: '/manufacturer',
+                ZAMRA:         '/regulator',
+                ZAMMSA:        '/handover',
+                PHARMACY:      '/pharmacy',
+            };
+            navigate(roleRoutes[data.role] ?? '/');
+        } catch (error) {
+            setErrorMsg(error.userMessage ?? 'Login failed.'); // from apiClient interceptor
+        }
     };
 
     return (

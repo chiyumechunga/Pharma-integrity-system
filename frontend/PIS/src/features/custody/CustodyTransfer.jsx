@@ -1,136 +1,155 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
+import { Html5QrcodeScanner } from 'html5-qrcode';
+import { useNavigate } from 'react-router-dom'; // 1. Import useNavigate
 import styles from './CustodyTransfer.module.css';
 import { apiClient } from "../../services/apiClient.js";
-import { useMutation } from "@tanstack/react-query";
-import { useAuth } from '../auth/AuthContext'; // 1. Import Auth Context
+import { useMutation, useQuery } from "@tanstack/react-query";
+import { useAuth } from '../auth/AuthContext';
 
 export default function CustodyTransfer() {
-    // 2. Extract user and logout function
     const { user, logout } = useAuth();
+    const navigate = useNavigate(); // 2. Initialize navigation stack
+    const [isScanning, setIsScanning] = useState(false);
+    const [scannedBatch, setScannedBatch] = useState('');
+    const [selectedRecipient, setSelectedRecipient] = useState('');
 
-    const offlineScans = 3;
+    // Determine the safe "pop" destination based on the user's origin node
+    const getBackPath = () => {
+        if (user?.role === 'MANUFACTURER') return '/manufacturer';
+        if (user?.role === 'PHARMACY') return '/pharmacy';
+        return null; // ZAMMSA stays here, no back button rendered
+    };
+    const backPath = getBackPath();
+
+    const { data: participants } = useQuery({
+        queryKey: ['participants'],
+        queryFn: async () => {
+            const response = await apiClient.get('/participants');
+            return response.data.filter(p => p.participantId !== user?.participantId);
+        }
+    });
 
     const transferMutation = useMutation({
         mutationFn: async (transferData) => {
-            // Adjusted to hit the root POST endpoint of CustodyController
             const response = await apiClient.post('/custody', transferData);
             return response.data;
         },
         onSuccess: () => {
-            alert("Transfer recorded successfully!");
+            alert(`Custody of ${scannedBatch} successfully transferred to recipient.`);
+            setScannedBatch('');
+            setSelectedRecipient('');
         },
         onError: (error) => {
             alert("Transfer failed: " + (error.response?.data?.message || error.message));
         }
     });
 
-    // Dummy function to test the mutation without the camera scanner
-    const handleDummySend = () => {
+    useEffect(() => {
+        let scanner;
+        if (isScanning) {
+            scanner = new Html5QrcodeScanner("handover-reader", {
+                fps: 10,
+                qrbox: { width: 250, height: 250 }
+            }, false);
+
+            scanner.render((decodedText) => {
+                setScannedBatch(decodedText);
+                setIsScanning(false);
+                scanner.clear();
+            }, () => { /* ignore background errors */ });
+        }
+        return () => { if (scanner) scanner.clear().catch(console.error); };
+    }, [isScanning]);
+
+    const handleTransferSubmit = (e) => {
+        e.preventDefault();
+        if (!scannedBatch || !selectedRecipient) return alert("Please scan a batch and select a recipient.");
+
         transferMutation.mutate({
-            batchNumber: "BAT-2026-XYZ",
-            // Dynamically use the logged-in user's participant ID if available
-            fromParticipantId: user?.participantId || "ZAMMSA-HQ",
-            toParticipantId: "PHARMACY-001"
+            batchNumber: scannedBatch,
+            fromParticipantId: user?.participantId,
+            toParticipantId: selectedRecipient,
+            eventType: 'DISTRIBUTED'
         });
     };
 
     return (
         <div className={styles.container}>
-            {/* Header & Sticky Top */}
             <header className={styles.header}>
                 <div>
+                    {/* 3. The Dynamic Back Button (Stack Pop) */}
+                    {backPath && (
+                        <button
+                            onClick={() => navigate(backPath)}
+                            style={{
+                                display: 'inline-flex',
+                                alignItems: 'center',
+                                gap: '8px',
+                                background: 'none',
+                                border: 'none',
+                                color: 'var(--on-surface-variant)',
+                                cursor: 'pointer',
+                                fontWeight: '600',
+                                fontFamily: 'var(--font-ui)',
+                                padding: 0,
+                                marginBottom: '16px',
+                                transition: 'color 0.2s'
+                            }}
+                            onMouseEnter={(e) => e.currentTarget.style.color = 'var(--primary)'}
+                            onMouseLeave={(e) => e.currentTarget.style.color = 'var(--on-surface-variant)'}
+                        >
+                            <span className="material-symbols-outlined" style={{ fontSize: '18px' }}>arrow_back</span>
+                            Back to Dashboard
+                        </button>
+                    )}
+
                     <h1 className={styles.title}>Handover</h1>
-                    {/* Dynamically show the logged-in user/facility name */}
-                    <p className={styles.subtitle}>{user?.username || 'Lusaka Central Depot'}</p>
+                    <p className={styles.subtitle}>{user?.username} • {user?.role}</p>
                 </div>
 
-                <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-                    {offlineScans > 0 && (
-                        <div className={styles.syncBadge}>
-                            <span className={`material-symbols-outlined ${styles.syncIcon}`}>
-                              cloud_off
-                            </span>
-                            <span className={styles.syncText}>{offlineScans} Queued</span>
-                        </div>
-                    )}
-                    {/* 3. The Secure Logout Button */}
-                    <button onClick={logout} className={styles.logoutBtn} title="Secure Logout">
-                        <span className="material-symbols-outlined">logout</span>
-                    </button>
-                </div>
+                <button onClick={logout} className={styles.logoutBtn} title="Secure Logout">
+                    <span className="material-symbols-outlined">logout</span>
+                </button>
             </header>
 
-            {/* Main Actions */}
             <section className={styles.actionSection}>
-                {/* Added onClick={handleDummySend} to test the API call */}
-                <div className={`${styles.actionCard} ${styles.actionCardPrimary}`} onClick={handleDummySend}>
-                    <div style={{ display: 'flex', gap: '16px', alignItems: 'center' }}>
-                        <div className={`${styles.actionIconWrapper} ${styles.bgPrimaryLight}`}>
-                          <span className="material-symbols-outlined" style={{ fontVariationSettings: "'FILL' 1" }}>
-                            qr_code_scanner
-                          </span>
-                        </div>
-                        <div className={styles.actionText}>
-                            <h3>Scan to Send</h3>
-                            <p>Transfer custody to driver</p>
-                        </div>
-                    </div>
-                    <span className={`material-symbols-outlined ${styles.chevron}`}>chevron_right</span>
-                </div>
+                <div className={styles.formCard}>
+                    <h2 style={{ marginBottom: '16px', fontSize: '18px', color: 'var(--primary)' }}>Logistics Transfer</h2>
 
-                <div className={styles.actionCard}>
-                    <div style={{ display: 'flex', gap: '16px', alignItems: 'center' }}>
-                        <div className={`${styles.actionIconWrapper} ${styles.bgSurfaceVariant}`}>
-                            <span className="material-symbols-outlined">call_received</span>
-                        </div>
-                        <div className={styles.actionText}>
-                            <h3>Scan to Receive</h3>
-                            <p>Accept delivery at facility</p>
-                        </div>
-                    </div>
-                    <span className={`material-symbols-outlined ${styles.chevron}`}>chevron_right</span>
-                </div>
-            </section>
-
-            {/* Loading Indicator */}
-            {transferMutation.isPending && (
-                <p style={{ textAlign: 'center', fontFamily: 'var(--font-ui)', color: 'var(--primary)', marginTop: '16px' }}>
-                    Recording on Ledger...
-                </p>
-            )}
-
-            {/* Recent Activity List */}
-            <section className={styles.listSection}>
-                <h2 className={styles.listHeader}>Recent Transfers</h2>
-
-                <div className={styles.list}>
-                    {/* Active List Item */}
-                    <div className={styles.listItem}>
-                        <div className={`${styles.statusIndicator} ${styles.statusActive}`}></div>
-                        <div className={styles.itemContent}>
-                            <div className={styles.itemHeader}>
-                                <span className={styles.batchNumber}>BAT-8924-XYZ</span>
-                                <span className={styles.time}>Just now</span>
+                    {isScanning ? (
+                        <div id="handover-reader" style={{ width: '100%', marginBottom: '16px' }}></div>
+                    ) : (
+                        <div className={styles.inputGroup}>
+                            <label className={styles.label}>Scanned Batch Number</label>
+                            <div style={{ display: 'flex', gap: '8px' }}>
+                                <input className={styles.input} value={scannedBatch} readOnly placeholder="Click icon to scan..." />
+                                <button className={styles.btnScan} onClick={() => setIsScanning(true)}>
+                                    <span className="material-symbols-outlined">qr_code_scanner</span>
+                                </button>
                             </div>
-                            <p className={styles.itemDetails}>
-                                <span className={styles.statusText}>In Transit</span> • Driver ID: 8842
-                            </p>
                         </div>
+                    )}
+
+                    <div className={styles.inputGroup} style={{ marginTop: '16px' }}>
+                        <label className={styles.label}>Recipient Participant</label>
+                        <select className={styles.select} value={selectedRecipient} onChange={(e) => setSelectedRecipient(e.target.value)}>
+                            <option value="">Select recipient...</option>
+                            {participants?.map(p => (
+                                <option key={p.participantId} value={p.participantId}>
+                                    {p.participantName} ({p.participantType})
+                                </option>
+                            ))}
+                        </select>
                     </div>
 
-                    {/* Past List Item */}
-                    <div className={styles.listItem}>
-                        <div className={styles.statusIndicator}></div>
-                        <div className={styles.itemContent}>
-                            <div className={styles.itemHeader}>
-                                <span className={styles.batchNumber}>BAT-7102-ABC</span>
-                                <span className={styles.time}>14:30</span>
-                            </div>
-                            <p className={styles.itemDetails}>
-                                Received • Pharmacy 44
-                            </p>
-                        </div>
-                    </div>
+                    <button
+                        className={styles.btnPrimary}
+                        onClick={handleTransferSubmit}
+                        disabled={transferMutation.isPending || !scannedBatch || !selectedRecipient}
+                        style={{ marginTop: '24px', width: '100%' }}
+                    >
+                        {transferMutation.isPending ? 'Writing to Ledger...' : 'Confirm Handover'}
+                    </button>
                 </div>
             </section>
         </div>
