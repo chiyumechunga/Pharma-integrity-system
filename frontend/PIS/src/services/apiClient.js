@@ -1,21 +1,21 @@
 // frontend/PIS/src/services/apiClient.js
 import axios from 'axios';
 
-const API_BASE_URL = import.meta.env.VITE_API_URL ?? '/api/v1/';
+// 1. Dynamically grab the IP address currently in the browser's address bar
+const currentHost = window.location.hostname;
 
-if (import.meta.env.DEV) {
-    console.info('[apiClient] Base URL:', API_BASE_URL);
-}
+// 2. Construct the backend URL using that same IP, but pointing to port 8080
+const dynamicBaseUrl = `https://${currentHost}:8080/api/v1/`;
 
 export const apiClient = axios.create({
-    baseURL: API_BASE_URL,
-    timeout: 20000, // 20s — Firefly/blockchain calls can be slow
+    baseURL: dynamicBaseUrl,
+    withCredentials: true,
     headers: {
-        'Content-Type': 'application/json',
-    },
+        'Content-Type': 'application/json'
+    }
 });
 
-// ── Request: inject JWT ───────────────────────────────────────────────────────
+// Request: inject JWT
 apiClient.interceptors.request.use(
     (config) => {
         const token = localStorage.getItem('authToken'); // matches AuthContext key
@@ -47,9 +47,16 @@ apiClient.interceptors.response.use(
 
         const { status, data } = error.response;
 
-        // Attach the backend's message to the error so components can display it
-        error.userMessage = data?.message ?? fallbackMessage(status);
-        error.validationErrors = data?.validationErrors ?? null; // from GlobalExceptionHandler
+        // FIXED: Catch raw text/HTML errors from Spring Boot before they break React
+        if (typeof data === 'string') {
+            console.error("Raw Backend Error:", data); // Logs the stack trace
+            error.userMessage = 'A server error occurred. Please check the backend console.';
+            error.validationErrors = null;
+        } else {
+            // Standard JSON error handling
+            error.userMessage = data?.message ?? fallbackMessage(status);
+            error.validationErrors = data?.validationErrors ?? null;
+        }
 
         // 401 — token expired or invalid: clear session
         // Use a custom event so React Router (not window.location) handles the redirect

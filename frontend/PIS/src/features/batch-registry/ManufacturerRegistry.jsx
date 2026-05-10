@@ -14,18 +14,18 @@ export default function ManufacturerDashboard() {
     // 1. DATA FETCHING (Products and Batches)
     const { data: products } = useQuery({
         queryKey: ['products'],
-        queryFn: async () => (await apiClient.get('/products')).data
+        queryFn: async () => (await apiClient.get('products')).data
     });
 
     const { data: inventory, isLoading: isLoadingInventory } = useQuery({
         queryKey: ['myInventory'],
-        queryFn: async () => (await apiClient.get('/batches')).data,
+        queryFn: async () => (await apiClient.get('batches')).data,
         refetchInterval: 30000
     });
 
     // 2. MUTATIONS (Batch & Product Creation)
     const productMutation = useMutation({
-        mutationFn: async (data) => (await apiClient.post('/products', data)).data,
+        mutationFn: async (data) => (await apiClient.post('products', data)).data,
         onSuccess: () => {
             queryClient.invalidateQueries(['products']);
             setActiveTab('products');
@@ -34,7 +34,7 @@ export default function ManufacturerDashboard() {
     });
 
     const batchMutation = useMutation({
-        mutationFn: async (data) => (await apiClient.post('/batches', data)).data,
+        mutationFn: async (data) => (await apiClient.post('batches', data)).data,
         onSuccess: () => {
             queryClient.invalidateQueries(['myInventory']);
             setActiveTab('inventory');
@@ -43,9 +43,34 @@ export default function ManufacturerDashboard() {
 
     // Helper: Register Asset to Blockchain
     const registerToBlockchain = useMutation({
-        mutationFn: async (batchNumber) => (await apiClient.post(`/batches/${batchNumber}/register`)).data,
+        mutationFn: async (batchNumber) => (await apiClient.post(`batches/${batchNumber}/register`)).data,
         onSuccess: () => queryClient.invalidateQueries(['myInventory'])
     });
+
+    // Helper: Download QR Code from Backend
+    const downloadQrCode = async (batchNumber) => {
+        try {
+            // Explicitly request a blob so Axios doesn't try to parse the PNG as JSON
+            const response = await apiClient.get(`batches/${batchNumber}/qrcode`, {
+                responseType: 'blob'
+            });
+
+            // Create a temporary local URL for the downloaded image blob
+            const url = window.URL.createObjectURL(new Blob([response.data]));
+            const link = document.createElement('a'); // 'a' stands for anchor tag
+            link.href = url;
+            link.setAttribute('download', `PharmaTrust_QR_${batchNumber}.png`); // File name
+            document.body.appendChild(link);
+            link.click();
+
+            // Clean up
+            link.parentNode.removeChild(link);
+            window.URL.revokeObjectURL(url);
+        } catch (error) {
+            console.error("Failed to download QR Code", error);
+            alert("Could not download QR code. Ensure the batch is CONFIRMED.");
+        }
+    };
 
     return (
         <div className={styles.dashboardWrapper}>
@@ -53,13 +78,13 @@ export default function ManufacturerDashboard() {
             <aside className={styles.sidebar}>
                 <div className={styles.sidebarBrand}>
                     <span className="material-symbols-outlined">health_and_safety</span>
-                    PharmaTrust
+                    <span>Blockchain Based Pharmaceutical Integrity System</span>
                 </div>
                 <div className={`${styles.navItem} ${activeTab === 'inventory' ? styles.activeNav : ''}`} onClick={() => setActiveTab('inventory')}>
-                    <span className="material-symbols-outlined">inventory_2</span> Production Ledger
+                    <span className="material-symbols-outlined">inventory_2</span> Drug Catalog
                 </div>
                 <div className={`${styles.navItem} ${activeTab === 'products' ? styles.activeNav : ''}`} onClick={() => setActiveTab('products')}>
-                    <span className="material-symbols-outlined">medication</span> Drug Catalog
+                    <span className="material-symbols-outlined">medication</span> Register Drug
                 </div>
                 <div className={`${styles.navItem} ${activeTab === 'mint' ? styles.activeNav : ''}`} onClick={() => setActiveTab('mint')}>
                     <span className="material-symbols-outlined">add_box</span> Mint New Batch
@@ -75,14 +100,14 @@ export default function ManufacturerDashboard() {
             <main className={styles.mainContent}>
                 <header className={styles.header}>
                     <h1 className={styles.title}>
-                        {activeTab === 'inventory' && "Production Ledger"}
-                        {activeTab === 'products' && "Drug Catalog"}
-                        {activeTab === 'mint' && "Mint New Asset"}
+                        {activeTab === 'inventory' && "Drug Catalog"}
+                        {activeTab === 'products' && "Register Drug"}
+                        {activeTab === 'mint' && "Mint New Batch"}
                     </h1>
                     <p className={styles.subtitle}>{user?.username} • Manufacturer Node</p>
                 </header>
 
-                {/* VIEW 1: PRODUCTION LEDGER (INVENTORY) */}
+                {/* VIEW 1: DRUG CATALOG */}
                 {activeTab === 'inventory' && (
                     <section className={styles.inventorySection}>
                         <div className={styles.tableContainer}>
@@ -100,13 +125,35 @@ export default function ManufacturerDashboard() {
                                     <tr key={batch.batchNumber}>
                                         <td>{batch.batchNumber}</td>
                                         <td>{batch.productName}</td>
-                                        <td><span className={`${styles.statusPill} ${batch.status === 'CONFIRMED' ? styles.statusPassed : styles.statusTransit}`}>{batch.status}</span></td>
+
+                                        {/* FIXED: Using currentStatus for the pill */}
                                         <td>
-                                            {batch.status === 'PENDING_BLOCKCHAIN' && (
+                                            <span className={`${styles.statusPill} ${batch.currentStatus === 'CONFIRMED' ? styles.statusPassed : styles.statusTransit}`}>
+                                                {batch.currentStatus}
+                                            </span>
+                                        </td>
+
+                                        <td style={{ display: 'flex', gap: '8px' }}>
+
+                                            {/* FIXED: Using currentStatus for the Register button */}
+                                            {batch.currentStatus === 'PENDING_BLOCKCHAIN' && (
                                                 <button onClick={() => registerToBlockchain.mutate(batch.batchNumber)} className={styles.btnAction}>
                                                     Register on Chain
                                                 </button>
                                             )}
+
+                                            {/* FIXED: Using currentStatus for the Download QR button */}
+                                            {(batch.currentStatus === 'CONFIRMED' || batch.currentStatus === 'PENDING_CONFIRMATION') && (
+                                                <button
+                                                    onClick={() => downloadQrCode(batch.batchNumber)}
+                                                    className={styles.btnAction}
+                                                    style={{ backgroundColor: '#2a9d8f', color: 'white', border: 'none' }}
+                                                >
+                                                    <span className="material-symbols-outlined" style={{ fontSize: '16px', marginRight: '4px' }}>qr_code_2</span>
+                                                    Download QR
+                                                </button>
+                                            )}
+
                                         </td>
                                     </tr>
                                 ))}
@@ -116,7 +163,7 @@ export default function ManufacturerDashboard() {
                     </section>
                 )}
 
-                {/* VIEW 2: PRODUCT MASTER FORM  */}
+                {/* VIEW 2: REGISTER DRUG */}
                 {activeTab === 'products' && (
                     <div className={styles.formCard}>
                         <form onSubmit={(e) => {
@@ -129,15 +176,19 @@ export default function ManufacturerDashboard() {
                                 <div className={styles.inputGroup}><label>Generic Name</label><input name="genericName" required className={styles.input} /></div>
                                 <div className={styles.inputGroup}><label>Brand Name</label><input name="brandName" className={styles.input} /></div>
                                 <div className={styles.inputGroup}><label>Dosage Form</label><input name="dosageForm" placeholder="e.g. Syrup" className={styles.input} /></div>
+                                <div className={styles.inputGroup}><label>Strength</label><input name="strength" placeholder="e.g. 500mg, 100 IU/mL" className={styles.input} /></div>
                                 <div className={styles.inputGroup}><label>Therapeutic Class</label><input name="therapeuticClass" className={styles.input} /></div>
                                 <div className={styles.inputGroup}><label>Approved by ZAMRA</label><select name="approvedByZamra" className={styles.select}><option value="true">Yes</option><option value="false">No</option></select></div>
                             </div>
-                            <button type="submit" className={styles.btnPrimary}>Create Product Entry</button>
+                            {/* FIXED: Added formActions wrapper for padding and alignment */}
+                            <div className={styles.formActions}>
+                                <button type="submit" className={styles.btnPrimary}>Create Product Entry</button>
+                            </div>
                         </form>
                     </div>
                 )}
 
-                {/* VIEW 3: MINT BATCH FORM [cite: 6] */}
+                {/* VIEW 3: MINT BATCH FORM */}
                 {activeTab === 'mint' && (
                     <div className={styles.formCard}>
                         <form onSubmit={(e) => {
@@ -162,7 +213,10 @@ export default function ManufacturerDashboard() {
                                 <div className={styles.inputGroup}><label>Mfg Date</label><input type="date" name="manufacturingDate" className={styles.input} /></div>
                                 <div className={styles.inputGroup}><label>Expiry Date</label><input type="date" name="expiryDate" className={styles.input} /></div>
                             </div>
-                            <button type="submit" className={styles.btnPrimary}>Register on Ledger</button>
+                            {/* FIXED: Added formActions wrapper for padding and alignment */}
+                            <div className={styles.formActions}>
+                                <button type="submit" className={styles.btnPrimary}>Register on Ledger</button>
+                            </div>
                         </form>
                     </div>
                 )}

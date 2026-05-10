@@ -1,6 +1,7 @@
+// src/features/pharmacy/PharmacyDashboard.jsx
 import React, { useState, useEffect } from 'react';
 import { Html5QrcodeScanner } from 'html5-qrcode';
-import { useMutation } from '@tanstack/react-query';
+import { useMutation, useQuery } from '@tanstack/react-query';
 import { apiClient } from '../../services/apiClient';
 import { useAuth } from '../auth/AuthContext';
 import { useNavigate } from 'react-router-dom';
@@ -10,9 +11,17 @@ export default function PharmacyDashboard() {
     const { user, logout } = useAuth();
     const navigate = useNavigate();
     const [isScanning, setIsScanning] = useState(false);
-    const [scanMode, setScanMode] = useState(null); // 'RECEIVE' or 'DISPENSE'
+    const [scanMode, setScanMode] = useState(null);
+    const [activeTab, setActiveTab] = useState('operations');
 
-    // 1. Verify Authentication before Dispensing
+    // ── Security Alerts Query ──
+    const { data: alerts } = useQuery({
+        queryKey: ['securityAlerts'],
+        queryFn: async () => (await apiClient.get('/analytics/suspicious-scans')).data,
+        enabled: activeTab === 'alerts'
+    });
+
+    // ── Mutations ──
     const verifyMutation = useMutation({
         mutationFn: async (qrHash) => {
             const response = await apiClient.post('/verifications', {
@@ -24,180 +33,181 @@ export default function PharmacyDashboard() {
         }
     });
 
-    // 2. Finalize Dispensing (Trigger Chaincode DispenseBatch)
     const dispenseMutation = useMutation({
         mutationFn: async (batchNumber) => {
-            // Assuming OperationController or BatchController handles the dispense action
             const response = await apiClient.post('/operations/dispense', {
                 batchNumber: batchNumber,
-                pharmacyId: user?.participantId || 'PHARMACY-DEFAULT'
+                pharmacyId: user?.participantId
             });
             return response.data;
         },
         onSuccess: () => {
-            alert('Medication successfully dispensed and ledger updated.');
-            verifyMutation.reset();
-            setScanMode(null);
-        },
-        onError: (err) => {
-            alert(`Dispense failed: ${err.response?.data?.message || err.message}`);
+            alert('Success: Ledger updated. Medication dispensed.');
+            closeScanner();
         }
     });
 
+    const destroyMutation = useMutation({
+        mutationFn: async (batchNumber) => {
+            const response = await apiClient.post('/operations/destroy', {
+                batchNumber: batchNumber,
+                reason: 'Expired/Damaged',
+                participantId: user?.participantId
+            });
+            return response.data;
+        },
+        onSuccess: () => {
+            alert('Blockchain updated: Batch marked as DESTROYED.');
+            closeScanner();
+        }
+    });
+
+    // ── QR Scanner Engine ──
     useEffect(() => {
         let scanner;
         if (isScanning) {
             scanner = new Html5QrcodeScanner("reader", {
                 fps: 10,
-                qrbox: { width: 250, height: 250 },
-                aspectRatio: 1.0
+                qrbox: { width: 250, height: 250 }
             }, false);
 
             scanner.render(
                 (decodedText) => {
-                    scanner.pause();
-                    setIsScanning(false);
-                    if (scanMode === 'DISPENSE') {
-                        verifyMutation.mutate(decodedText);
+                    // 1. Try to pause to prevent double-scans
+                    try {
+                        scanner.pause();
+                    } catch (err) {
+                        console.log("Static image detected, skipping pause.");
                     }
-                    scanner.clear();
+
+                    // 2. Clear the scanner UI from the screen
+                    scanner.clear().then(() => {
+                        // 3. Update React state and route the logic
+                        setIsScanning(false);
+                        if (scanMode === 'DISPENSE') verifyMutation.mutate(decodedText);
+                        if (scanMode === 'DESTROY') destroyMutation.mutate(decodedText);
+                        if (scanMode === 'AUDIT') navigate(`/provenance/${decodedText}`);
+                    }).catch(console.error);
                 },
-                () => {} // ignore scan errors
+                () => {} // ignore ongoing scan errors
             );
         }
-
-        return () => {
-            if (scanner) scanner.clear().catch(console.error);
-        };
+        return () => scanner?.clear().catch(() => {});
     }, [isScanning, scanMode]);
 
-    const handleStartScan = (mode) => {
-        if (mode === 'RECEIVE') {
-            // Reroute to our existing Custody Transfer module for logistics handling
-            navigate('/handover');
-        } else {
-            setScanMode(mode);
-            setIsScanning(true);
-        }
+
+    const handleActionClick = (mode) => {
+        if (mode === 'RECEIVE') return navigate('/receive-inventory');
+        if (mode === 'RETURN') return navigate('/handover');
+        setScanMode(mode);
+        setIsScanning(true);
+    };
+
+    const closeScanner = () => {
+        setIsScanning(false);
+        setScanMode(null);
+        verifyMutation.reset();
     };
 
     const scanResult = verifyMutation.data;
-    const isSafeToDispense = scanResult?.status === 'PASSED';
+    const isSafe = scanResult?.status === 'PASSED' || scanResult?.status === 'AUTHENTIC';
 
     return (
-        <div className={styles.container}>
-            <header className={styles.header}>
-                <div>
-                    <h1 className={styles.title}>Pharmacy Operations</h1>
-                    <p className={styles.subtitle}>Inventory Reception & Point of Sale</p>
+        <div className={styles.dashboardWrapper}>
+            <aside className={styles.sidebar}>
+                <div className={styles.sidebarBrand}>
+                    <span className="material-symbols-outlined">verified</span>
+                    <span>Blockchain-Based Pharmaceutical Integrity System</span>
                 </div>
-                <div className={styles.userProfile}>
-                    <span className="material-symbols-outlined">local_pharmacy</span>
-                    <span>{user?.username || 'Facility Pharmacist'}</span>
-                    <button onClick={logout} className={styles.logoutBtn} title="Secure Logout">
-                        <span className="material-symbols-outlined">logout</span>
-                    </button>
+                <div className={`${styles.navItem} ${activeTab === 'operations' && styles.activeNav}`} onClick={() => setActiveTab('operations')}>
+                    <span className="material-symbols-outlined">point_of_sale</span> Operations
                 </div>
-            </header>
-
-            <div className={styles.dashboardGrid}>
-                {/* Inventory Reception Link */}
-                <div className={styles.actionCard} style={{ cursor: 'pointer' }} onClick={() => handleStartScan('RECEIVE')}>
-                    <div className={`${styles.iconCircle} ${styles.bgPrimaryLight}`}>
-                        <span className="material-symbols-outlined" style={{ fontSize: '32px' }}>local_shipping</span>
-                    </div>
-                    <h3 style={{ fontSize: '20px', color: 'var(--primary)', marginBottom: '8px' }}>Receive Inventory</h3>
-                    <p style={{ fontFamily: 'var(--font-ui)', color: 'var(--on-surface-variant)', fontSize: '14px' }}>
-                        Confirm receipt of batches from distributors and update the permanent custody chain.
-                    </p>
+                <div className={`${styles.navItem} ${activeTab === 'alerts' && styles.activeNav}`} onClick={() => setActiveTab('alerts')}>
+                    <span className="material-symbols-outlined">warning</span> Security Alerts
                 </div>
+                <button onClick={logout} className={`${styles.navItem} ${styles.logoutBtn}`}>
+                    <span className="material-symbols-outlined">logout</span> Sign Out
+                </button>
+            </aside>
 
-                {/* Dispense Trigger */}
-                <div className={styles.actionCard} style={{ cursor: 'pointer' }} onClick={() => handleStartScan('DISPENSE')}>
-                    <div className={`${styles.iconCircle} ${styles.bgSecondaryLight}`}>
-                        <span className="material-symbols-outlined" style={{ fontSize: '32px' }}>prescriptions</span>
-                    </div>
-                    <h3 style={{ fontSize: '20px', color: 'var(--primary)', marginBottom: '8px' }}>Dispense Medication</h3>
-                    <p style={{ fontFamily: 'var(--font-ui)', color: 'var(--on-surface-variant)', fontSize: '14px' }}>
-                        Scan QR at Point of Sale. Verifies authenticity before marking product as sold to patient.
-                    </p>
-                </div>
+            <main className={styles.mainContent}>
+                <header className={styles.header}>
+                    <h1 className={styles.title}>
+                        {activeTab === 'operations' ? "Pharmacy Hub" : "Security Monitoring"}
+                    </h1>
+                    <p className={styles.subtitle}>{user?.username} • Facility Node</p>
+                </header>
 
-                {/* Active Scanner & Verification Zone */}
-                {(isScanning || scanResult || verifyMutation.isPending) && (
-                    <div className={styles.scannerZone}>
-                        <h2 style={{ fontSize: '18px', color: 'var(--primary)', marginBottom: '24px', textAlign: 'center' }}>
-                            {scanResult ? 'Authenticity Verification Result' : 'Point of Sale Scanner'}
-                        </h2>
+                {activeTab === 'operations' && (
+                    <div className={styles.dashboardGrid}>
+                        <div className={styles.actionCard} onClick={() => handleActionClick('RECEIVE')}>
+                            <div className={`${styles.iconCircle} ${styles.bgPrimaryLight}`}><span className="material-symbols-outlined">local_shipping</span></div>
+                            <h3>Receive Inventory</h3>
+                        </div>
+                        <div className={styles.actionCard} onClick={() => handleActionClick('DISPENSE')}>
+                            <div className={`${styles.iconCircle} ${styles.bgSecondaryLight}`}><span className="material-symbols-outlined">prescriptions</span></div>
+                            <h3>Dispense Item</h3>
+                        </div>
+                        <div className={styles.actionCard} onClick={() => handleActionClick('RETURN')}>
+                            <div className={styles.iconCircle} style={{backgroundColor: '#FFEFEF', color: '#D62828'}}><span className="material-symbols-outlined">assignment_return</span></div>
+                            <h3>Return Stock</h3>
+                        </div>
+                        <div className={styles.actionCard} onClick={() => handleActionClick('AUDIT')}>
+                            <div className={styles.iconCircle} style={{backgroundColor: '#E8F5E9', color: '#2E7D32'}}><span className="material-symbols-outlined">history</span></div>
+                            <h3>Provenance Audit</h3>
+                        </div>
+                        <div className={styles.actionCard} onClick={() => handleActionClick('DESTROY')}>
+                            <div className={styles.iconCircle} style={{backgroundColor: '#F5F5F5', color: '#424242'}}><span className="material-symbols-outlined">delete_forever</span></div>
+                            <h3>Mark Destroyed</h3>
+                        </div>
 
+                        {/* Reusable Scanner Zone */}
                         {isScanning && (
-                            <div className={styles.scannerWrapper}>
-                                <div id="reader"></div>
+                            <div className={styles.scannerZone}>
+                                <h2 style={{textAlign:'center', marginBottom: '16px'}}>Scanning for {scanMode}...</h2>
+                                <div className={styles.scannerWrapper}><div id="reader"></div></div>
+                                <div style={{textAlign:'center', marginTop: '16px'}}><button className={styles.btnPrimary} onClick={closeScanner}>Cancel</button></div>
                             </div>
                         )}
 
-                        {verifyMutation.isPending && (
-                            <div className={styles.scannerPlaceholder}>
-                                <span className="material-symbols-outlined" style={{ animation: 'spin 2s linear infinite', fontSize: '48px', color: 'var(--primary-container)' }}>
-                                    sync
-                                </span>
-                                <p style={{ marginTop: '16px', fontFamily: 'var(--font-ui)', fontWeight: '600' }}>Querying Ledger...</p>
-                            </div>
-                        )}
-
+                        {/* RESTORED: Result View UI */}
                         {scanResult && (
-                            <div className={styles.resultCard}>
-                                <div className={`${styles.statusBadge} ${isSafeToDispense ? styles.statusPassed : styles.statusDanger}`}>
-                                    <span className="material-symbols-outlined" style={{ fontSize: '18px', fontVariationSettings: "'FILL' 1" }}>
-                                        {isSafeToDispense ? 'verified' : 'warning'}
-                                    </span>
-                                    {scanResult.status}
-                                </div>
-
-                                <h3 style={{ fontSize: '22px', color: 'var(--primary)', marginBottom: '16px' }}>
-                                    {scanResult.productName || 'Unknown Product'}
-                                </h3>
-
-                                <p style={{ fontFamily: 'var(--font-ui)', fontSize: '14px', color: 'var(--on-surface-variant)', marginBottom: '32px' }}>
-                                    Batch No: <strong>{scanResult.batchNumber}</strong><br/>
-                                    Expiry: {scanResult.expiryDate}
-                                </p>
-
-                                {/* Strict Point of Sale Gatekeeper Logic */}
-                                {isSafeToDispense ? (
-                                    <button
-                                        className={styles.btnPrimary}
-                                        onClick={() => dispenseMutation.mutate(scanResult.batchNumber)}
-                                        disabled={dispenseMutation.isPending}
-                                    >
-                                        <span className="material-symbols-outlined">check_circle</span>
-                                        {dispenseMutation.isPending ? 'Dispensing...' : 'Confirm Dispense'}
-                                    </button>
-                                ) : (
-                                    <div style={{ display: 'flex', flexDirection: 'column', gap: '16px', alignItems: 'center' }}>
-                                        <button className={styles.btnDanger} disabled>
-                                            <span className="material-symbols-outlined">block</span>
-                                            Dispense Blocked
-                                        </button>
-                                        <p style={{ color: '#d62828', fontSize: '13px', fontWeight: '600' }}>
-                                            This medication is unsafe and cannot be dispensed. Hand over to facility management immediately.
-                                        </p>
+                            <div className={styles.scannerZone}>
+                                <div className={styles.resultCard}>
+                                    <div className={`${styles.statusBadge} ${isSafe ? styles.statusPassed : styles.statusDanger}`}>
+                                        {isSafe ? 'AUTHENTIC' : 'FLAGGED'}
                                     </div>
-                                )}
+                                    <h3>{scanResult.productName}</h3>
+                                    <p>Batch: <strong>{scanResult.batchNumber}</strong></p>
 
-                                <div style={{ marginTop: '24px' }}>
-                                    <button
-                                        style={{ background: 'none', border: 'none', color: 'var(--primary-container)', fontWeight: '600', cursor: 'pointer' }}
-                                        onClick={() => { verifyMutation.reset(); setScanMode(null); }}
-                                    >
-                                        Cancel & Return
-                                    </button>
+                                    {isSafe ? (
+                                        <button className={styles.btnPrimary} onClick={() => dispenseMutation.mutate(scanResult.batchNumber)}>
+                                            Confirm Dispense
+                                        </button>
+                                    ) : (
+                                        <p style={{color: '#d62828'}}>This batch is unsafe for dispensing.</p>
+                                    )}
+                                    <button onClick={closeScanner} style={{marginTop: '16px', background: 'none', border: 'none', color: 'blue', cursor: 'pointer'}}>Close</button>
                                 </div>
                             </div>
                         )}
                     </div>
                 )}
-            </div>
+
+                {activeTab === 'alerts' && (
+                    <div className={styles.scannerZone}>
+                        <h3>Regional Security Alerts</h3>
+                        {alerts?.length > 0 ? (
+                            alerts.map((alert, i) => (
+                                <div key={i} className={styles.resultCard} style={{marginBottom: '10px', borderLeft: '5px solid red'}}>
+                                    <strong>{alert.productName}</strong> - {alert.riskLevel} Risk
+                                    <p>Multiple scans detected for Batch {alert.batchNumber}</p>
+                                </div>
+                            ))
+                        ) : <p>No suspicious patterns detected.</p>}
+                    </div>
+                )}
+            </main>
         </div>
     );
 }

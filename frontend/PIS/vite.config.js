@@ -12,9 +12,8 @@ export default defineConfig({
     host: '0.0.0.0',   // expose on all interfaces — required for phone access
     port: 5173,
     https: {
-      // Use mkcert cert — trusted on laptop + phone already
-      key:  fs.readFileSync(path.join(mkcertDir, 'rootCA-key.pem')),
-      cert: fs.readFileSync(path.join(mkcertDir, 'rootCA.pem')),
+      key:  fs.readFileSync('./localhost+2-key.pem'),
+      cert: fs.readFileSync('./localhost+2.pem'),
     },
     // No proxy — VITE_API_URL is absolute (https://192.168.0.142:8080/api/v1/)
     // Proxy only makes sense when VITE_API_URL=/api/v1/ (relative)

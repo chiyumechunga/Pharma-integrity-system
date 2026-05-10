@@ -1,11 +1,70 @@
 /* src/features/pharmacy/PharmacyDashboard.module.css */
 
+/* ── 1. Dashboard Shell & Layout ── */
+.dashboardWrapper {
+    display: flex;
+    min-height: 100vh;
+    background-color: var(--surface);
+}
+
+.mainContent {
+    flex: 1;
+    padding: 40px 48px;
+    overflow-y: auto;
+    max-width: 1200px;
+    margin: 0 auto;
+    width: 100%;
+}
+
 .container {
     max-width: 1000px;
     margin: 0 auto;
     padding: 32px 24px;
 }
 
+/* ── 2. Sidebar Navigation ── */
+.sidebar {
+    width: 260px;
+    background-color: var(--primary);
+    color: white;
+    padding: 32px 16px;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+
+.sidebarBrand {
+    font-size: 20px;
+    font-weight: 700;
+    margin-bottom: 32px;
+    padding: 0 12px;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+}
+
+.navItem {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 12px;
+    border-radius: 8px;
+    cursor: pointer;
+    font-family: var(--font-ui);
+    font-size: 14px;
+    font-weight: 500;
+    transition: background 0.2s;
+}
+
+.navItem:hover {
+    background: rgba(255,255,255,0.1);
+}
+
+.activeNav {
+    background: var(--primary-container);
+}
+
+/* ── 3. Headers & Typography ── */
 .header {
     display: flex;
     justify-content: space-between;
@@ -35,20 +94,13 @@
     font-size: 14px;
 }
 
-/* Dashboard Grid */
+/* ── 4. Dashboard Grid & Cards ── */
 .dashboardGrid {
     display: grid;
     grid-template-columns: 1fr 1fr;
     gap: 32px;
 }
 
-@media (max-width: 768px) {
-    .dashboardGrid {
-        grid-template-columns: 1fr;
-    }
-}
-
-/* Action Cards */
 .actionCard {
     background: white;
     border-radius: var(--radius-xl);
@@ -80,7 +132,7 @@
 .bgPrimaryLight { background-color: var(--primary-light); color: var(--primary-container); }
 .bgSecondaryLight { background-color: rgba(42, 157, 143, 0.1); color: var(--status-passed); }
 
-/* Dispense Scanner Zone */
+/* ── 5. Scanner Zone & Results ── */
 .scannerZone {
     background: white;
     border-radius: var(--radius-xl);
@@ -113,7 +165,6 @@
     border-radius: var(--radius-xl);
 }
 
-/* Result Card */
 .resultCard {
     background: var(--surface);
     border: 1px solid var(--border);
@@ -124,6 +175,7 @@
     text-align: center;
 }
 
+/* ── 6. Buttons & Badges ── */
 .statusBadge {
     display: inline-flex;
     align-items: center;
@@ -167,7 +219,7 @@
     font-family: var(--font-ui);
     font-weight: 600;
     font-size: 15px;
-    cursor: not-allowed; /* Locked state */
+    cursor: not-allowed;
     display: inline-flex;
     align-items: center;
     gap: 8px;
@@ -191,4 +243,59 @@
 .logoutBtn:hover {
     background-color: rgba(214, 40, 40, 0.1);
     color: #d62828;
+}
+
+/* ── 7. Mobile Responsiveness ── */
+@media (max-width: 768px) {
+    .dashboardWrapper {
+        flex-direction: column;
+        padding-bottom: 80px; /* Room for bottom nav */
+    }
+
+    .dashboardGrid {
+        grid-template-columns: 1fr;
+        gap: 16px;
+    }
+
+    .sidebar {
+        width: 100%;
+        flex-direction: row;
+        align-items: center;
+        padding: 16px;
+        gap: 12px;
+        overflow-x: auto;
+        white-space: nowrap;
+        position: fixed;
+        bottom: 0;
+        left: 0;
+        right: 0;
+        z-index: 1000;
+        box-shadow: 0 -4px 20px rgba(0, 0, 0, 0.15);
+        -ms-overflow-style: none;
+        scrollbar-width: none;
+    }
+
+    .sidebar::-webkit-scrollbar { display: none; }
+
+    .sidebarBrand {
+        margin-bottom: 0;
+        padding: 0;
+        margin-right: 8px;
+    }
+
+    .sidebarBrand span:last-child { display: none; }
+
+    .navItem {
+        padding: 8px 16px;
+        font-size: 13px;
+    }
+
+    .navItem:last-child {
+        margin-top: 0 !important;
+        margin-left: auto;
+    }
+
+    .mainContent { padding: 24px 16px; }
+    .title { font-size: 24px; }
+    .actionCard, .scannerZone { padding: 24px 16px; }
 }

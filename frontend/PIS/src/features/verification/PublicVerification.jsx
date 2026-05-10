@@ -1,42 +1,60 @@
 import React, { useEffect, useState } from 'react';
 import { Html5QrcodeScanner } from 'html5-qrcode';
-import { useMutation } from '@tanstack/react-query';
+import { useQuery } from '@tanstack/react-query';
 import { apiClient } from '../../services/apiClient';
 import { Link } from 'react-router-dom';
 import styles from './PublicVerification.module.css';
 
 export default function PublicVerification() {
     const [isScanning, setIsScanning] = useState(false);
+    const [scannedHash, setScannedHash] = useState(null);
 
-    // Verification API Call
-    const verifyMutation = useMutation({
-        mutationFn: async (qrHash) => {
-            const response = await apiClient.post('/verifications', {
-                qrHash: qrHash,
-                deviceFingerprint: navigator.userAgent,
-                geoLocation: 'Lusaka, ZM'
-            });
+    // 1. Fire-and-forget: Grab LIVE location and log the scan to the backend
+    useEffect(() => {
+        if (scannedHash) {
+            const logVerification = (locationString) => {
+                apiClient.post('/verifications', {
+                    qrHash: scannedHash,
+                    deviceFingerprint: navigator.userAgent,
+                    geoLocation: locationString
+                }).catch(err => console.error("Audit log failed:", err));
+            };
+
+            // Request live GPS coordinates from the user's device
+            if ("geolocation" in navigator) {
+                navigator.geolocation.getCurrentPosition(
+                    (position) => {
+                        // Success: Format the coordinates
+                        const lat = position.coords.latitude.toFixed(7);
+                        const lng = position.coords.longitude.toFixed(7);
+                        logVerification(`${lat},${lng}`);
+                    },
+                    (error) => {
+                        // Failed or Denied by user
+                        console.warn("Geolocation denied or failed.", error);
+                        logVerification('Location Denied (Public)');
+                    },
+                    { timeout: 10000, maximumAge: 60000 } // Wait up to 10 seconds for a GPS lock
+                );
+            } else {
+                // Browser doesn't support GPS
+                logVerification('Location Unavailable (Public)');
+            }
+        }
+    }, [scannedHash]);
+
+    // 2. Fetch the rich Provenance Data from Spring Boot
+    const { data: scanResult, isPending, isError } = useQuery({
+        queryKey: ['provenance', scannedHash],
+        queryFn: async () => {
+            const response = await apiClient.get(`/provenance/${scannedHash}`);
             return response.data;
         },
-        onError: (err) => {
-            // Fallback dummy data if backend endpoint isn't fully ready yet
-            console.warn("Backend error, using fallback data for demonstration.", err);
-            return {
-                status: 'PASSED',
-                productName: 'Amoxicillin 500mg Capsules',
-                batchNumber: 'BAT-2026-XYZ',
-                manufacturerId: 'PharmaCorp Zambia',
-                timestamp: new Date().toISOString(),
-                // NEW: Provenance history array
-                history: [
-                    { action: 'MINTED', location: 'Lusaka South Hub Factory', time: 'Oct 12, 2025' },
-                    { action: 'IN_TRANSIT', location: 'ZAMMSA Central Logistics', time: 'Oct 14, 2025' },
-                    { action: 'RECEIVED', location: 'Pharmacy 44 - Kabulonga', time: 'Oct 15, 2025' },
-                ]
-            };
-        }
+        enabled: !!scannedHash, // Only run this when we have a hash
+        retry: false // Don't retry if it's a 404 (Counterfeit)
     });
 
+    // 3. Scanner Engine
     useEffect(() => {
         let scanner;
         if (isScanning) {
@@ -49,12 +67,9 @@ export default function PublicVerification() {
             scanner.render(
                 (decodedText) => {
                     scanner.pause();
-                    verifyMutation.mutate(decodedText, {
-                        onSettled: () => {
-                            setIsScanning(false);
-                            scanner.clear();
-                        }
-                    });
+                    setIsScanning(false);
+                    setScannedHash(decodedText);
+                    scanner.clear();
                 },
                 () => { /* ignore background scan errors */ }
             );
@@ -65,14 +80,24 @@ export default function PublicVerification() {
         };
     }, [isScanning]);
 
-    const scanResult = verifyMutation.data;
-    const isSafe = scanResult?.status === 'PASSED';
+    const resetScanner = () => {
+        setScannedHash(null);
+        setIsScanning(true);
+    };
+
+    // Helper for Banner Styling
+    const getStatusStyle = (status) => {
+        if (status === 'AUTHENTIC') return styles.statusAuthentic;
+        if (status === 'COUNTERFEIT' || status === 'RECALLED') return styles.statusCounterfeit;
+        if (status === 'EXPIRED') return styles.statusExpired;
+        return styles.statusUnknown;
+    };
 
     return (
         <div className={styles.container}>
 
             {/* Back to Home Navigation */}
-            {!isScanning && !scanResult && (
+            {!isScanning && !scannedHash && (
                 <Link to="/" className={styles.backLink}>
                     <span className="material-symbols-outlined" style={{ fontSize: '18px' }}>arrow_back</span>
                     Back to Home
@@ -81,25 +106,21 @@ export default function PublicVerification() {
 
             <header className={styles.header}>
                 <div style={{ display: 'flex', justifyContent: 'center', marginBottom: '16px' }}>
-          <span className="material-symbols-outlined" style={{ fontSize: '48px', color: 'var(--primary-container)', fontVariationSettings: "'FILL' 1" }}>
-            health_and_safety
-          </span>
+                    <span className="material-symbols-outlined" style={{ fontSize: '48px', color: 'var(--primary-container)', fontVariationSettings: "'FILL' 1" }}>
+                        health_and_safety
+                    </span>
                 </div>
                 <h1 className={styles.title}>Verify Medication</h1>
                 <p className={styles.subtitle}>Scan the cryptographic QR code on the packaging to verify its origin and journey.</p>
             </header>
 
             {/* State 1: Ready to Scan */}
-            {!isScanning && !scanResult && (
+            {!isScanning && !scannedHash && (
                 <>
                     <div className={styles.scannerPlaceholder}>
-                        {verifyMutation.isPending ? (
-                            <span style={{ color: 'var(--primary)', fontWeight: '600' }}>Verifying with Ledger...</span>
-                        ) : (
-                            <span className="material-symbols-outlined" style={{ fontSize: '64px', color: 'rgba(0, 70, 85, 0.2)' }}>qr_code_scanner</span>
-                        )}
+                        <span className="material-symbols-outlined" style={{ fontSize: '64px', color: 'rgba(0, 70, 85, 0.2)' }}>qr_code_scanner</span>
                     </div>
-                    <button className={styles.btnPrimary} onClick={() => setIsScanning(true)} disabled={verifyMutation.isPending}>
+                    <button className={styles.btnPrimary} onClick={() => setIsScanning(true)}>
                         <span className="material-symbols-outlined">camera</span>
                         Tap to Scan
                     </button>
@@ -119,68 +140,99 @@ export default function PublicVerification() {
                 </div>
             )}
 
-            {/* State 3: Result View */}
-            {scanResult && (
+            {/* State 3: Loading Data */}
+            {scannedHash && isPending && (
+                <div className={styles.messageZone}>
+                    <span className="material-symbols-outlined" style={{ fontSize: '48px', color: 'var(--primary)', animation: 'spin 2s linear infinite' }}>hourglass_empty</span>
+                    <p style={{ marginTop: '16px', fontWeight: '600', color: 'var(--primary)' }}>Querying National Ledger...</p>
+                </div>
+            )}
+
+            {/* State 4: Error / Counterfeit (404 Not Found) */}
+            {scannedHash && isError && (
+                <div className={styles.errorCard}>
+                    <span className="material-symbols-outlined" style={{ fontSize: '48px', color: '#d62828' }}>gpp_bad</span>
+                    <h2 style={{ color: '#d62828', marginTop: '12px' }}>WARNING</h2>
+                    <p>UNREGISTERED / POTENTIAL COUNTERFEIT</p>
+                    <p style={{ fontSize: '12px', color: '#666', marginTop: '8px', marginBottom: '24px' }}>
+                        This QR code does not exist on the national registry. Do not consume this product.
+                    </p>
+                    <button className={styles.btnSecondary} onClick={resetScanner}>Scan Another Product</button>
+                </div>
+            )}
+
+            {/* State 5: Success / Provenance View */}
+            {scanResult && !isError && (
                 <div className={styles.resultCard}>
-                    <div style={{ display: 'flex', justifyContent: 'center' }}>
-                        <div
-                            className={styles.statusBadge}
-                            style={{
-                                backgroundColor: isSafe ? 'rgba(42, 157, 143, 0.1)' : '#d62828',
-                                color: isSafe ? 'var(--status-passed)' : 'white'
-                            }}
-                        >
-              <span className="material-symbols-outlined" style={{ fontSize: '18px', fontVariationSettings: "'FILL' 1" }}>
-                {isSafe ? 'verified' : 'warning'}
-              </span>
-                            {scanResult.status}
-                        </div>
+
+                    {/* Dynamic Status Banner */}
+                    <div className={`${styles.statusBanner} ${getStatusStyle(scanResult.verificationStatus)}`}>
+                        <span className="material-symbols-outlined" style={{ fontVariationSettings: "'FILL' 1" }}>
+                            {scanResult.verificationStatus === 'AUTHENTIC' ? 'verified_user' : 'warning'}
+                        </span>
+                        {scanResult.verificationStatus}
                     </div>
 
                     <h3 style={{ textAlign: 'center', fontSize: '20px', color: 'var(--primary)', marginBottom: '24px' }}>
-                        {scanResult.productName || 'Unknown Product'}
+                        {scanResult.productDetails.genericName}
                     </h3>
 
                     <div className={styles.detailRow}>
                         <span className={styles.detailLabel}>Batch No.</span>
-                        <span className={styles.detailValue}>{scanResult.batchNumber}</span>
+                        <span className={styles.detailValue}>{scanResult.productDetails.batchNumber}</span>
                     </div>
                     <div className={styles.detailRow}>
-                        <span className={styles.detailLabel}>Manufacturer ID</span>
-                        <span className={styles.detailValue}>{scanResult.manufacturerId}</span>
+                        <span className={styles.detailLabel}>Manufacturer</span>
+                        <span className={styles.detailValue}>{scanResult.productDetails.manufacturer}</span>
+                    </div>
+                    <div className={styles.detailRow}>
+                        <span className={styles.detailLabel}>Expiry Date</span>
+                        <span className={styles.detailValue}>{scanResult.productDetails.expiryDate}</span>
                     </div>
 
-                    {/* NEW: Provenance Timeline Section */}
+                    {/* Provenance Timeline Section */}
                     <div className={styles.timelineSection}>
-                        <h4 className={styles.timelineTitle}>Supply Chain Journey</h4>
+                        <h4 className={styles.timelineTitle}>Chain of Custody</h4>
 
-                        {scanResult.history && scanResult.history.length > 0 ? (
-                            scanResult.history.map((event, index) => (
-                                <div className={styles.timelineItem} key={index}>
-                                    <div className={styles.timelineConnector}></div>
-                                    <div className={styles.timelineDot}></div>
-                                    <div className={styles.timelineContent}>
-                                        <h4>{event.action.replace('_', ' ')}</h4>
-                                        <p>{event.location}</p>
-                                        <p style={{ fontSize: '11px', opacity: 0.8 }}>{event.time}</p>
+                        {scanResult.provenanceTimeline && scanResult.provenanceTimeline.length > 0 ? (
+                            [...scanResult.provenanceTimeline].reverse().map((event, index) => {
+                                const date = new Date(event.timestamp).toLocaleString('en-GB', {
+                                    day: 'numeric', month: 'short', year: 'numeric',
+                                    hour: '2-digit', minute: '2-digit'
+                                });
+
+                                return (
+                                    <div className={styles.timelineItem} key={index}>
+                                        <div className={styles.timelineConnector}></div>
+                                        <div className={styles.timelineDot}></div>
+                                        <div className={styles.timelineContent}>
+                                            <span className={styles.eventTime}>{date}</span>
+                                            <h4 className={styles.eventType}>{event.eventType.replace('_', ' ')}</h4>
+
+                                            {event.eventType === 'MANUFACTURED' ? (
+                                                <p className={styles.participants}>Origin: {event.fromParticipant || event.toParticipant}</p>
+                                            ) : event.eventType === 'TRANSFER' ? (
+                                                <p className={styles.participants}>
+                                                    From: {event.fromParticipant} <br/>
+                                                    To: <strong>{event.toParticipant}</strong>
+                                                </p>
+                                            ) : (
+                                                <p className={styles.participants}>Location: {event.toParticipant}</p>
+                                            )}
+
+                                            <p className={styles.eventTx}>TX: {event.blockchainTxId?.substring(0, 16)}...</p>
+                                        </div>
                                     </div>
-                                </div>
-                            ))
+                                );
+                            })
                         ) : (
-                            <p style={{ fontFamily: 'var(--font-ui)', fontSize: '14px', color: 'var(--on-surface-variant)' }}>
+                            <p style={{ fontSize: '14px', color: 'var(--on-surface-variant)' }}>
                                 No journey history available for this asset.
                             </p>
                         )}
                     </div>
 
-                    <button
-                        className={styles.btnPrimary}
-                        style={{ marginTop: '32px' }}
-                        onClick={() => {
-                            verifyMutation.reset();
-                            setIsScanning(true);
-                        }}
-                    >
+                    <button className={styles.btnPrimary} style={{ marginTop: '32px' }} onClick={resetScanner}>
                         <span className="material-symbols-outlined">qr_code_scanner</span>
                         Scan Another Package
                     </button>

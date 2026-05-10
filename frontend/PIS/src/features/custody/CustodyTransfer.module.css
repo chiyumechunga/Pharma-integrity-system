@@ -1,73 +1,369 @@
 /* src/features/custody/CustodyTransfer.module.css */
 
-/* 1. Responsive Container */
+/* ── Base container — mobile-first, scales up ─────────────────────────── */
 .container {
-    max-width: 600px; /* Widened for a better tablet/desktop experience */
+    width: 100%;
+    max-width: 680px;
     margin: 0 auto;
-    min-height: 100vh;
-    padding-bottom: 100px;
+    min-height: 100dvh;           /* dvh fixes mobile browser chrome */
+    padding-bottom: env(safe-area-inset-bottom, 24px);
     background-color: var(--surface);
 }
 
-/* 2. Header & Sync Badge */
+/* ── Header ───────────────────────────────────────────────────────────── */
 .header {
-    padding: 32px 24px 24px;
+    padding: 20px 16px 16px;
     position: sticky;
     top: 0;
-    background: rgba(247, 250, 249, 0.9);
+    background: rgba(247, 250, 249, 0.92);
     backdrop-filter: blur(12px);
+    -webkit-backdrop-filter: blur(12px);
     z-index: 50;
     display: flex;
     justify-content: space-between;
     align-items: flex-start;
     border-bottom: 1px solid var(--border);
-    margin-bottom: 24px;
+    margin-bottom: 16px;
+}
+
+@media (min-width: 480px) {
+    .header { padding: 28px 24px 20px; margin-bottom: 24px; }
 }
 
 .title {
-    font-size: 28px;
+    font-size: clamp(22px, 5vw, 28px);
     font-weight: 700;
     letter-spacing: -0.02em;
     color: var(--primary);
-    margin-bottom: 4px;
+    margin-bottom: 2px;
 }
 
 .subtitle {
     font-family: var(--font-ui);
-    font-size: 13px;
+    font-size: clamp(11px, 2.5vw, 13px);
     color: var(--on-surface-variant);
 }
 
-/* 3. Missing Form & Card Styles (This fixes your screenshot!) */
-.actionSection {
-    padding: 0 24px;
+/* ── Sync badge ───────────────────────────────────────────────────────── */
+.syncBadge {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    background-color: var(--warning-bg);
+    color: var(--warning);
+    border: 1px solid var(--warning);
+    border-radius: 999px;
+    padding: 4px 10px;
+    font-family: var(--font-ui);
+    font-size: 12px;
+    font-weight: 600;
 }
 
+.syncIcon { font-size: 14px !important; }
+.syncText { white-space: nowrap; }
+
+/* ── Logout button ────────────────────────────────────────────────────── */
+.logoutBtn {
+    background: transparent;
+    border: none;
+    color: var(--on-surface-variant);
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 8px;
+    border-radius: 50%;
+    min-width: 44px;               /* touch target */
+    min-height: 44px;
+    transition: all 0.2s ease;
+    -webkit-tap-highlight-color: transparent;
+}
+
+.logoutBtn:hover { background-color: rgba(214, 40, 40, 0.08); color: #d62828; }
+.logoutBtn:active { transform: scale(0.92); }
+
+/* ── Action cards ─────────────────────────────────────────────────────── */
+.actionSection {
+    padding: 0 16px;
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+}
+
+@media (min-width: 480px) {
+    .actionSection { padding: 0 24px; }
+}
+
+/* On tablets, show side by side */
+@media (min-width: 600px) {
+    .actionSection { flex-direction: row; }
+    .actionSection > * { flex: 1; }
+}
+
+.actionCard {
+    background: white;
+    border: 1px solid var(--border);
+    border-radius: var(--radius-xl);
+    padding: 18px 16px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    -webkit-tap-highlight-color: transparent;
+    min-height: 72px;
+    box-shadow: 0 2px 8px rgba(0, 70, 85, 0.04);
+}
+
+@media (min-width: 480px) {
+    .actionCard { padding: 20px; }
+}
+
+.actionCard:hover {
+    border-color: var(--primary-container);
+    box-shadow: 0 4px 16px rgba(0, 70, 85, 0.08);
+    transform: translateY(-1px);
+}
+
+.actionCard:active { transform: scale(0.98); }
+
+.actionCardPrimary {
+    background: linear-gradient(135deg, var(--primary) 0%, var(--primary-container) 100%);
+    border-color: transparent;
+}
+
+.actionCardPrimary h3,
+.actionCardPrimary p,
+.actionCardPrimary .chevron { color: white !important; }
+
+.actionIconWrapper {
+    width: 44px;
+    height: 44px;
+    border-radius: 12px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+    font-size: 22px;
+}
+
+.bgPrimaryLight {
+    background-color: rgba(255, 255, 255, 0.2);
+    color: white;
+}
+
+.bgSurfaceVariant {
+    background-color: var(--surface-variant);
+    color: var(--primary-container);
+}
+
+.actionText { flex: 1; min-width: 0; }
+
+.actionText h3 {
+    font-size: clamp(14px, 3vw, 16px);
+    font-weight: 700;
+    color: var(--on-surface);
+    margin-bottom: 2px;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.actionText p {
+    font-family: var(--font-ui);
+    font-size: clamp(11px, 2.5vw, 13px);
+    color: var(--on-surface-variant);
+}
+
+.chevron {
+    color: var(--on-surface-variant);
+    flex-shrink: 0;
+}
+
+/* ── Scanner wrapper ──────────────────────────────────────────────────── */
+.scannerWrapper {
+    margin: 16px 16px 0;
+    background: #000;
+    border-radius: var(--radius-xl);
+    overflow: hidden;
+    box-shadow: 0 12px 32px rgba(0, 70, 85, 0.15);
+}
+
+@media (min-width: 480px) {
+    .scannerWrapper { margin: 16px 24px 0; }
+}
+
+/* ── Feedback messages ────────────────────────────────────────────────── */
+.feedbackSuccess {
+    margin: 12px 16px 0;
+    padding: 12px 16px;
+    background: rgba(42, 157, 143, 0.1);
+    color: var(--status-passed);
+    border-radius: 12px;
+    font-family: var(--font-ui);
+    font-size: 14px;
+    font-weight: 600;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.feedbackError {
+    margin: 12px 16px 0;
+    padding: 12px 16px;
+    background: rgba(214, 40, 40, 0.08);
+    color: #d62828;
+    border-radius: 12px;
+    font-family: var(--font-ui);
+    font-size: 14px;
+    font-weight: 600;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+@media (min-width: 480px) {
+    .feedbackSuccess, .feedbackError { margin: 12px 24px 0; }
+}
+
+/* ── Pending indicator ────────────────────────────────────────────────── */
+.pendingText {
+    text-align: center;
+    color: var(--primary);
+    font-family: var(--font-ui);
+    font-size: 14px;
+    font-weight: 600;
+    padding: 16px;
+}
+
+/* ── Recent transfers list ────────────────────────────────────────────── */
+.listSection {
+    padding: 24px 16px 0;
+}
+
+@media (min-width: 480px) {
+    .listSection { padding: 32px 24px 0; }
+}
+
+.listHeader {
+    font-size: clamp(15px, 3vw, 17px);
+    font-weight: 700;
+    color: var(--on-surface);
+    margin-bottom: 12px;
+}
+
+.list {
+    background: white;
+    border: 1px solid var(--border);
+    border-radius: var(--radius-lg);
+    overflow: hidden;
+}
+
+.listItem {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 14px 16px;
+    border-bottom: 1px solid var(--border);
+    transition: background 0.15s;
+}
+
+.listItem:last-child { border-bottom: none; }
+.listItem:active { background: var(--surface-variant); }
+
+@media (min-width: 480px) {
+    .listItem { padding: 16px 20px; gap: 14px; }
+}
+
+.statusIndicator {
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    background-color: var(--border);
+    flex-shrink: 0;
+}
+
+.statusActive { background-color: var(--status-passed); }
+
+.itemContent { flex: 1; min-width: 0; }
+
+.itemHeader {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 2px;
+    gap: 8px;
+}
+
+.batchNumber {
+    font-family: var(--font-ui);
+    font-size: clamp(13px, 3vw, 14px);
+    font-weight: 700;
+    color: var(--on-surface);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.time {
+    font-family: var(--font-ui);
+    font-size: 11px;
+    color: var(--on-surface-variant);
+    flex-shrink: 0;
+}
+
+.itemDetails {
+    font-family: var(--font-ui);
+    font-size: 12px;
+    color: var(--on-surface-variant);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.statusText { font-weight: 600; color: var(--status-passed); }
+
+/* ── Empty / loading states ───────────────────────────────────────────── */
+.emptyState {
+    padding: 32px 16px;
+    text-align: center;
+    font-family: var(--font-ui);
+    font-size: 14px;
+    color: var(--on-surface-variant);
+}
+
+/* ── Form card (for future use) ───────────────────────────────────────── */
 .formCard {
     background: white;
     border: 1px solid var(--border);
     border-radius: var(--radius-xl);
-    padding: 32px;
-    box-shadow: 0 8px 32px rgba(0, 70, 85, 0.04);
+    padding: 20px 16px;
+    box-shadow: 0 4px 16px rgba(0, 70, 85, 0.04);
+}
+
+@media (min-width: 480px) {
+    .formCard { padding: 28px 24px; }
 }
 
 .inputGroup {
     display: flex;
     flex-direction: column;
-    gap: 8px;
-    margin-bottom: 20px;
+    gap: 6px;
+    margin-bottom: 16px;
 }
 
 .label {
     font-family: var(--font-ui);
-    font-size: 13px;
+    font-size: 12px;
     font-weight: 600;
     color: var(--on-surface-variant);
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
 }
 
 .input, .select {
     width: 100%;
-    padding: 14px 16px;
+    padding: 13px 14px;
     border: 1px solid var(--border);
     border-radius: 12px;
     font-family: var(--font-ui);
@@ -75,6 +371,7 @@
     background-color: var(--surface);
     color: var(--on-surface);
     transition: border-color 0.2s, box-shadow 0.2s;
+    min-height: 48px;              /* touch target */
 }
 
 .input:focus, .select:focus {
@@ -86,18 +383,18 @@
 .select {
     cursor: pointer;
     appearance: none;
-    background-image: url("data:image/svg+xml;charset=US-ASCII,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20width%3D%2224%22%20height%3D%2224%22%20viewBox%3D%220%200%2024%2024%22%20fill%3D%22none%22%20stroke%3D%22%236f797c%22%20stroke-width%3D%222%22%20stroke-linecap%3D%22round%22%20stroke-linejoin%3D%22round%22%3E%3Cpolyline%20points%3D%226%209%2012%2015%2018%209%22%3E%3C%2Fpolyline%3E%3C%2Fsvg%3E");
+    background-image: url("data:image/svg+xml;charset=US-ASCII,%3Csvg xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22 width%3D%2224%22 height%3D%2224%22 viewBox%3D%220 0 24 24%22 fill%3D%22none%22 stroke%3D%22%236f797c%22 stroke-width%3D%222%22%3E%3Cpolyline points%3D%226 9 12 15 18 9%22%3E%3C%2Fpolyline%3E%3C%2Fsvg%3E");
     background-repeat: no-repeat;
-    background-position: right 16px center;
+    background-position: right 14px center;
     background-size: 16px;
+    padding-right: 40px;
 }
 
-/* 4. Buttons */
 .btnPrimary {
     background-color: var(--primary-container);
     color: white;
     border: none;
-    padding: 16px 32px;
+    padding: 15px 24px;
     border-radius: 999px;
     font-family: var(--font-ui);
     font-weight: 600;
@@ -108,51 +405,20 @@
     align-items: center;
     justify-content: center;
     gap: 8px;
+    width: 100%;
+    min-height: 52px;              /* touch target */
+    -webkit-tap-highlight-color: transparent;
 }
 
 .btnPrimary:hover:not(:disabled) {
     background-color: var(--secondary);
-    transform: translateY(-1px);
     box-shadow: 0 4px 12px rgba(0, 95, 115, 0.2);
 }
+
+.btnPrimary:active:not(:disabled) { transform: scale(0.98); }
 
 .btnPrimary:disabled {
     background-color: var(--surface-container-high);
     color: var(--on-surface-variant);
     cursor: not-allowed;
-}
-
-.btnScan {
-    background-color: var(--primary-light);
-    color: var(--primary-container);
-    border: none;
-    border-radius: 12px;
-    width: 64px;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    cursor: pointer;
-    transition: background-color 0.2s;
-}
-
-.btnScan:hover {
-    background-color: rgba(0, 95, 115, 0.2);
-}
-
-.logoutBtn {
-    background: transparent;
-    border: none;
-    color: var(--on-surface-variant);
-    cursor: pointer;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    padding: 8px;
-    border-radius: 50%;
-    transition: all 0.2s ease;
-}
-
-.logoutBtn:hover {
-    background-color: rgba(214, 40, 40, 0.1);
-    color: #d62828;
 }

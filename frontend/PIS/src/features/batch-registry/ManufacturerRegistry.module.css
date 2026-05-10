@@ -264,3 +264,181 @@
     padding: 32px 48px;
     overflow-y: auto;
 }
+
+/* ── Mobile Responsiveness ───────────────────────────────────────── */
+@media (max-width: 768px) {
+    .dashboardWrapper {
+        flex-direction: column; /* Stack layout vertically */
+    }
+
+    /* Convert vertical sidebar to a horizontal scrollable navbar */
+    .sidebar {
+        width: 100%;
+        flex-direction: row;
+        align-items: center;
+        padding: 16px;
+        gap: 12px;
+        overflow-x: auto;
+        white-space: nowrap;
+        /* Hide scrollbar for cleaner UI */
+        -ms-overflow-style: none;
+        scrollbar-width: none;
+    }
+
+    .sidebar::-webkit-scrollbar {
+        display: none;
+    }
+
+    .sidebarBrand {
+        margin-bottom: 0;
+        padding: 0;
+        margin-right: 8px;
+    }
+
+    /* Hide the "PharmaTrust" text on mobile to save space, keep the icon */
+    .sidebarBrand span:last-child {
+        display: none;
+    }
+
+    .navItem {
+        padding: 8px 16px;
+        font-size: 13px;
+    }
+
+    /* Move the logout button to the far right of the scroll */
+    .navItem:last-child {
+        margin-top: 0 !important;
+        margin-left: auto;
+    }
+
+    /* Reduce massive desktop padding */
+    .mainContent {
+        padding: 24px 16px;
+    }
+
+    .title {
+        font-size: 24px;
+    }
+
+    .formCard {
+        padding: 24px 16px;
+    }
+
+    /* Make the dashboard scrollable but leave room for the bottom nav */
+    .dashboardWrapper {
+        padding-bottom: 80px;
+    }
+
+    /* Snap the navigation to the bottom of the phone */
+    .sidebar {
+        position: fixed;
+        bottom: 0;
+        left: 0;
+        right: 0;
+        z-index: 1000;
+        box-shadow: 0 -4px 20px rgba(0, 0, 0, 0.15);
+    }
+
+    /* Make the submit buttons full-width for thumbs */
+    .formActions {
+        margin-top: 24px;
+    }
+
+    .btnPrimary {
+        width: 100%;
+        justify-content: center;
+        padding: 16px;
+        font-size: 16px;
+    }
+}
+
+/* ── Inventory Table Styling ───────────────────────────────────────── */
+.tableContainer {
+    background: white;
+    border-radius: var(--radius-xl);
+    padding: 24px;
+    box-shadow: 0 8px 32px rgba(0, 70, 85, 0.04);
+    overflow-x: auto; /* Allows horizontal scrolling on small screens */
+    border: 1px solid var(--border);
+}
+
+.inventoryTable {
+    width: 100%;
+    border-collapse: collapse;
+    font-family: var(--font-ui);
+    text-align: left;
+}
+
+.inventoryTable th {
+    font-size: 12px;
+    font-weight: 600;
+    color: var(--on-surface-variant);
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    padding: 16px;
+    border-bottom: 2px solid var(--surface-container-high);
+}
+
+.inventoryTable td {
+    padding: 16px;
+    font-size: 14px;
+    color: var(--on-surface);
+    border-bottom: 1px solid var(--surface-variant);
+    vertical-align: middle;
+}
+
+.inventoryTable tr:last-child td {
+    border-bottom: none;
+}
+
+.inventoryTable tr:hover td {
+    background-color: var(--surface); /* Subtle hover effect */
+}
+
+/* Status Pills */
+.statusPill {
+    display: inline-flex;
+    align-items: center;
+    padding: 6px 12px;
+    border-radius: 999px;
+    font-size: 12px;
+    font-weight: 700;
+    letter-spacing: 0.04em;
+    white-space: nowrap;
+}
+
+.statusPassed {
+    background-color: rgba(42, 157, 143, 0.1);
+    color: var(--status-passed);
+}
+
+.statusTransit {
+    background-color: var(--warning-bg);
+    color: var(--warning);
+}
+
+/* Action Buttons within Table */
+.btnAction {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 8px 16px;
+    border-radius: var(--radius-lg);
+    font-family: var(--font-ui);
+    font-weight: 600;
+    font-size: 13px;
+    cursor: pointer;
+    background-color: var(--primary-light);
+    color: var(--primary-container);
+    border: 1px solid transparent;
+    transition: all 0.2s ease;
+}
+
+.btnAction:hover {
+    background-color: var(--primary-container);
+    color: white;
+}
+
+.btnAction:active {
+    transform: scale(0.96);
+}
