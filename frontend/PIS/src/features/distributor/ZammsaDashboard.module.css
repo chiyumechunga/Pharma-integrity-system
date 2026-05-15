@@ -1,0 +1,301 @@
+/* src/features/pharmacy/PharmacyDashboard.module.css */
+
+/* ── 1. Dashboard Shell & Layout ── */
+.dashboardWrapper {
+    display: flex;
+    min-height: 100vh;
+    background-color: var(--surface);
+}
+
+.mainContent {
+    flex: 1;
+    padding: 40px 48px;
+    overflow-y: auto;
+    max-width: 1200px;
+    margin: 0 auto;
+    width: 100%;
+}
+
+.container {
+    max-width: 1000px;
+    margin: 0 auto;
+    padding: 32px 24px;
+}
+
+/* ── 2. Sidebar Navigation ── */
+.sidebar {
+    width: 260px;
+    background-color: var(--primary);
+    color: white;
+    padding: 32px 16px;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+
+.sidebarBrand {
+    font-size: 20px;
+    font-weight: 700;
+    margin-bottom: 32px;
+    padding: 0 12px;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+}
+
+.navItem {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 12px;
+    border-radius: 8px;
+    cursor: pointer;
+    font-family: var(--font-ui);
+    font-size: 14px;
+    font-weight: 500;
+    transition: background 0.2s;
+}
+
+.navItem:hover {
+    background: rgba(255,255,255,0.1);
+}
+
+.activeNav {
+    background: var(--primary-container);
+}
+
+/* ── 3. Headers & Typography ── */
+.header {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-end;
+    margin-bottom: 32px;
+}
+
+.title {
+    font-size: 32px;
+    font-weight: 700;
+    color: var(--primary);
+    letter-spacing: -0.02em;
+}
+
+.subtitle {
+    font-family: var(--font-ui);
+    color: var(--on-surface-variant);
+    font-size: 14px;
+}
+
+.userProfile {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    font-family: var(--font-ui);
+    font-weight: 600;
+    font-size: 14px;
+}
+
+/* ── 4. Dashboard Grid & Cards ── */
+.dashboardGrid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 32px;
+}
+
+.actionCard {
+    background: white;
+    border-radius: var(--radius-xl);
+    padding: 32px;
+    box-shadow: 0 8px 32px rgba(0, 70, 85, 0.04);
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    text-align: center;
+    border: 1px solid var(--border);
+    transition: transform 0.2s ease, box-shadow 0.2s ease;
+}
+
+.actionCard:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 12px 40px rgba(0, 70, 85, 0.08);
+}
+
+.iconCircle {
+    width: 64px;
+    height: 64px;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    margin-bottom: 24px;
+}
+
+.bgPrimaryLight { background-color: var(--primary-light); color: var(--primary-container); }
+.bgSecondaryLight { background-color: rgba(42, 157, 143, 0.1); color: var(--status-passed); }
+
+/* ── 5. Scanner Zone & Results ── */
+.scannerZone {
+    background: white;
+    border-radius: var(--radius-xl);
+    padding: 32px;
+    box-shadow: 0 8px 32px rgba(0, 70, 85, 0.04);
+    grid-column: 1 / -1;
+    border: 1px solid var(--border);
+}
+
+.scannerWrapper {
+    width: 100%;
+    max-width: 400px;
+    margin: 0 auto;
+    background: #000;
+    border-radius: var(--radius-xl);
+    overflow: hidden;
+    box-shadow: 0 12px 32px rgba(0, 0, 0, 0.15);
+}
+
+.scannerPlaceholder {
+    width: 100%;
+    max-width: 400px;
+    aspect-ratio: 16/9;
+    margin: 0 auto;
+    background-color: var(--surface-container-high);
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    border-radius: var(--radius-xl);
+}
+
+.resultCard {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-xl);
+    padding: 32px;
+    max-width: 500px;
+    margin: 24px auto 0;
+    text-align: center;
+}
+
+/* ── 6. Buttons & Badges ── */
+.statusBadge {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 6px 16px;
+    border-radius: 999px;
+    font-family: var(--font-ui);
+    font-weight: 700;
+    font-size: 13px;
+    letter-spacing: 0.05em;
+    margin-bottom: 24px;
+}
+
+.statusPassed { background-color: rgba(42, 157, 143, 0.1); color: var(--status-passed); }
+.statusDanger { background-color: rgba(214, 40, 40, 0.1); color: #d62828; }
+
+.btnPrimary {
+    background-color: var(--primary-container);
+    color: white;
+    border: none;
+    padding: 16px 32px;
+    border-radius: 999px;
+    font-family: var(--font-ui);
+    font-weight: 600;
+    font-size: 15px;
+    cursor: pointer;
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    transition: all 0.2s ease;
+}
+
+.btnPrimary:hover { background-color: var(--secondary); }
+
+.btnDanger {
+    background-color: #d62828;
+    color: white;
+    border: none;
+    padding: 16px 32px;
+    border-radius: 999px;
+    font-family: var(--font-ui);
+    font-weight: 600;
+    font-size: 15px;
+    cursor: not-allowed;
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    opacity: 0.8;
+}
+
+.logoutBtn {
+    background: transparent;
+    border: none;
+    color: var(--on-surface-variant);
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 8px;
+    border-radius: 50%;
+    transition: all 0.2s ease;
+    margin-left: 12px;
+}
+
+.logoutBtn:hover {
+    background-color: rgba(214, 40, 40, 0.1);
+    color: #d62828;
+}
+
+/* ── 7. Mobile Responsiveness ── */
+@media (max-width: 768px) {
+    .dashboardWrapper {
+        flex-direction: column;
+        padding-bottom: 80px; /* Room for bottom nav */
+    }
+
+    .dashboardGrid {
+        grid-template-columns: 1fr;
+        gap: 16px;
+    }
+
+    .sidebar {
+        width: 100%;
+        flex-direction: row;
+        align-items: center;
+        padding: 16px;
+        gap: 12px;
+        overflow-x: auto;
+        white-space: nowrap;
+        position: fixed;
+        bottom: 0;
+        left: 0;
+        right: 0;
+        z-index: 1000;
+        box-shadow: 0 -4px 20px rgba(0, 0, 0, 0.15);
+        -ms-overflow-style: none;
+        scrollbar-width: none;
+    }
+
+    .sidebar::-webkit-scrollbar { display: none; }
+
+    .sidebarBrand {
+        margin-bottom: 0;
+        padding: 0;
+        margin-right: 8px;
+    }
+
+    .sidebarBrand span:last-child { display: none; }
+
+    .navItem {
+        padding: 8px 16px;
+        font-size: 13px;
+    }
+
+    .navItem:last-child {
+        margin-top: 0 !important;
+        margin-left: auto;
+    }
+
+    .mainContent { padding: 24px 16px; }
+    .title { font-size: 24px; }
+    .actionCard, .scannerZone { padding: 24px 16px; }
+}
