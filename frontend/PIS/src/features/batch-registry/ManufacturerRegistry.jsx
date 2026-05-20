@@ -9,7 +9,9 @@ export default function ManufacturerDashboard() {
     const { user, logout } = useAuth();
     const navigate = useNavigate();
     const queryClient = useQueryClient();
-    const [activeTab, setActiveTab] = useState('inventory'); // inventory, products, mint
+    const [activeTab, setActiveTab] = useState('inventory'); // inventory, products, mint, print
+    const [batchUnitCount, setBatchUnitCount] = useState(20); // Default to 20 units per batch
+    const [printBatch, setPrintBatch] = useState(null); // Tracks the batch currently selected for printing
 
     // 1. DATA FETCHING (Products and Batches)
     const { data: products } = useQuery({
@@ -47,29 +49,54 @@ export default function ManufacturerDashboard() {
         onSuccess: () => queryClient.invalidateQueries(['myInventory'])
     });
 
-    // Helper: Download QR Code from Backend
+    // Helper: Download Batch QR Code
     const downloadQrCode = async (batchNumber) => {
         try {
-            // Explicitly request a blob so Axios doesn't try to parse the PNG as JSON
             const response = await apiClient.get(`batches/${batchNumber}/qrcode`, {
                 responseType: 'blob'
             });
 
-            // Create a temporary local URL for the downloaded image blob
             const url = window.URL.createObjectURL(new Blob([response.data]));
-            const link = document.createElement('a'); // 'a' stands for anchor tag
+            const link = document.createElement('a');
             link.href = url;
-            link.setAttribute('download', `PharmaTrust_QR_${batchNumber}.png`); // File name
+            link.setAttribute('download', `PharmaTrust_BatchQR_${batchNumber}.png`);
             document.body.appendChild(link);
             link.click();
 
-            // Clean up
             link.parentNode.removeChild(link);
             window.URL.revokeObjectURL(url);
         } catch (error) {
             console.error("Failed to download QR Code", error);
             alert("Could not download QR code. Ensure the batch is CONFIRMED.");
         }
+    };
+
+    // Helper: Download Individual Unit QR Code
+    const downloadUnitQrCode = async (serialNumber) => {
+        try {
+            const response = await apiClient.get(`units/${serialNumber}/qrcode`, {
+                responseType: 'blob'
+            });
+
+            const url = window.URL.createObjectURL(new Blob([response.data]));
+            const link = document.createElement('a');
+            link.href = url;
+            link.setAttribute('download', `PharmaTrust_Unit_${serialNumber}.png`);
+            document.body.appendChild(link);
+            link.click();
+
+            link.parentNode.removeChild(link);
+            window.URL.revokeObjectURL(url);
+        } catch (error) {
+            console.error("Failed to download Unit QR Code", error);
+            alert(`Could not download QR code for unit ${serialNumber}.`);
+        }
+    };
+
+    // Helper: Setup Print View
+    const handlePrintLabels = (batch) => {
+        setPrintBatch(batch);
+        setActiveTab('print');
     };
 
     return (
@@ -103,6 +130,7 @@ export default function ManufacturerDashboard() {
                         {activeTab === 'inventory' && "Drug Catalog"}
                         {activeTab === 'products' && "Register Drug"}
                         {activeTab === 'mint' && "Mint New Batch"}
+                        {activeTab === 'print' && "Print Unit Labels"}
                     </h1>
                     <p className={styles.subtitle}>{user?.username} • Manufacturer Node</p>
                 </header>
@@ -125,35 +153,30 @@ export default function ManufacturerDashboard() {
                                     <tr key={batch.batchNumber}>
                                         <td>{batch.batchNumber}</td>
                                         <td>{batch.productName}</td>
-
-                                        {/* FIXED: Using currentStatus for the pill */}
                                         <td>
                                             <span className={`${styles.statusPill} ${batch.currentStatus === 'CONFIRMED' ? styles.statusPassed : styles.statusTransit}`}>
                                                 {batch.currentStatus}
                                             </span>
                                         </td>
-
                                         <td style={{ display: 'flex', gap: '8px' }}>
-
-                                            {/* FIXED: Using currentStatus for the Register button */}
                                             {batch.currentStatus === 'PENDING_BLOCKCHAIN' && (
                                                 <button onClick={() => registerToBlockchain.mutate(batch.batchNumber)} className={styles.btnAction}>
                                                     Register on Chain
                                                 </button>
                                             )}
 
-                                            {/* FIXED: Using currentStatus for the Download QR button */}
                                             {(batch.currentStatus === 'CONFIRMED' || batch.currentStatus === 'PENDING_CONFIRMATION') && (
-                                                <button
-                                                    onClick={() => downloadQrCode(batch.batchNumber)}
-                                                    className={styles.btnAction}
-                                                    style={{ backgroundColor: '#2a9d8f', color: 'white', border: 'none' }}
-                                                >
-                                                    <span className="material-symbols-outlined" style={{ fontSize: '16px', marginRight: '4px' }}>qr_code_2</span>
-                                                    Download QR
-                                                </button>
+                                                <>
+                                                    <button onClick={() => downloadQrCode(batch.batchNumber)} className={styles.btnAction} style={{ backgroundColor: '#2a9d8f', color: 'white', border: 'none' }}>
+                                                        <span className="material-symbols-outlined" style={{ fontSize: '16px', marginRight: '4px' }}>qr_code_2</span>
+                                                        Batch QR
+                                                    </button>
+                                                    <button onClick={() => handlePrintLabels(batch)} className={styles.btnAction} style={{ backgroundColor: '#e76f51', color: 'white', border: 'none' }}>
+                                                        <span className="material-symbols-outlined" style={{ fontSize: '16px', marginRight: '4px' }}>print</span>
+                                                        Unit Labels
+                                                    </button>
+                                                </>
                                             )}
-
                                         </td>
                                     </tr>
                                 ))}
@@ -180,7 +203,6 @@ export default function ManufacturerDashboard() {
                                 <div className={styles.inputGroup}><label>Therapeutic Class</label><input name="therapeuticClass" className={styles.input} /></div>
                                 <div className={styles.inputGroup}><label>Approved by ZAMRA</label><select name="approvedByZamra" className={styles.select}><option value="true">Yes</option><option value="false">No</option></select></div>
                             </div>
-                            {/* FIXED: Added formActions wrapper for padding and alignment */}
                             <div className={styles.formActions}>
                                 <button type="submit" className={styles.btnPrimary}>Create Product Entry</button>
                             </div>
@@ -196,7 +218,8 @@ export default function ManufacturerDashboard() {
                             const data = new FormData(e.target);
                             batchMutation.mutate({
                                 ...Object.fromEntries(data.entries()),
-                                manufacturerId: user.participantId
+                                manufacturerId: user.participantId,
+                                batchUnitCount: parseInt(batchUnitCount, 10) // Included unit count in payload
                             });
                         }}>
                             <div className={styles.formGrid}>
@@ -212,12 +235,90 @@ export default function ManufacturerDashboard() {
                                 <div className={styles.inputGroup}><label>Batch Number</label><input name="batchNumber" required className={styles.input} /></div>
                                 <div className={styles.inputGroup}><label>Mfg Date</label><input type="date" name="manufacturingDate" className={styles.input} /></div>
                                 <div className={styles.inputGroup}><label>Expiry Date</label><input type="date" name="expiryDate" className={styles.input} /></div>
+
+                                {/* NEW INPUT: Batch Unit Count */}
+                                <div className={styles.inputGroup}>
+                                    <label>Units in Batch (Primary Packaging)</label>
+                                    <input
+                                        type="number"
+                                        min="1"
+                                        value={batchUnitCount}
+                                        onChange={(e) => setBatchUnitCount(e.target.value)}
+                                        required
+                                        className={styles.input}
+                                        placeholder="e.g., 20"
+                                    />
+                                </div>
+                                <div className={styles.inputGroup}>
+                                    <p style={{fontSize: '12px', color: 'var(--on-surface-variant)', marginTop: '24px'}}>
+                                        * System will automatically generate deterministic serial numbers and individual QR hashes for each unit.
+                                    </p>
+                                </div>
                             </div>
-                            {/* FIXED: Added formActions wrapper for padding and alignment */}
+
                             <div className={styles.formActions}>
                                 <button type="submit" className={styles.btnPrimary}>Register on Ledger</button>
                             </div>
                         </form>
+                    </div>
+                )}
+
+                {/* VIEW 4: PRINT LABELS */}
+                {activeTab === 'print' && printBatch && (
+                    <div className={styles.formCard}>
+                        {/* UPDATED HEADER: Now includes the Back Button */}
+                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '24px' }}>
+
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
+                                {/* NEW: Back Button */}
+                                <button
+                                    onClick={() => setActiveTab('inventory')}
+                                    className={styles.btnAction}
+                                    style={{ background: '#e9ecef', color: '#333', border: 'none', padding: '8px 16px' }}
+                                >
+                                    <span className="material-symbols-outlined" style={{ fontSize: '18px', marginRight: '4px' }}>arrow_back</span>
+                                    Back
+                                </button>
+
+                                <h2 style={{margin: 0}}>Batch: {printBatch.batchNumber}</h2>
+                            </div>
+
+                            <button onClick={() => window.print()} className={styles.btnPrimary} style={{ backgroundColor: '#e76f51' }}>
+                                <span className="material-symbols-outlined" style={{ marginRight: '8px' }}>print</span>
+                                Print {printBatch.batchUnitCount || 0} Labels
+                            </button>
+                        </div>
+
+                        <div style={{ display: 'flex', flexWrap: 'wrap', gap: '20px' }}>
+                            {Array.from({ length: printBatch.batchUnitCount || 0 }, (_, i) => i + 1).map(num => {
+                                const serialNumber = `${printBatch.batchNumber}-SN${String(num).padStart(3, '0')}`;
+                                return (
+                                    <div key={serialNumber} style={{ border: '1px solid #e0e0e0', padding: '16px', textAlign: 'center', borderRadius: '8px', background: '#fafafa', width: '220px', display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
+                                        <p style={{ margin: '0 0 8px 0', fontWeight: 'bold', fontSize: '14px', color: 'var(--primary)' }}>{printBatch.productName}</p>
+
+                                        <img
+                                            src={`http://localhost:8080/api/v1/units/${serialNumber}/qrcode`}
+                                            alt={`QR for ${serialNumber}`}
+                                            style={{ width: '150px', height: '150px', marginBottom: '12px' }}
+                                        />
+
+                                        <p style={{ margin: '0 0 12px 0', fontSize: '12px', fontFamily: 'monospace', background: '#e9ecef', padding: '4px 8px', borderRadius: '4px' }}>
+                                            {serialNumber}
+                                        </p>
+
+                                        {/* NEW: Download Button for individual unit */}
+                                        <button
+                                            onClick={() => downloadUnitQrCode(serialNumber)}
+                                            className={styles.btnAction}
+                                            style={{ width: '100%', justifyContent: 'center' }}
+                                        >
+                                            <span className="material-symbols-outlined" style={{ fontSize: '16px', marginRight: '4px' }}>download</span>
+                                            Download QR
+                                        </button>
+                                    </div>
+                                );
+                            })}
+                        </div>
                     </div>
                 )}
             </main>

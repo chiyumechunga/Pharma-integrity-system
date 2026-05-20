@@ -3,6 +3,8 @@ package com.chiyumechunga.backend.util;
 import io.jsonwebtoken.Claims;
 import io.jsonwebtoken.JwtException;
 import io.jsonwebtoken.Jwts;
+import io.jsonwebtoken.io.Decoders;
+import io.jsonwebtoken.security.Keys;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
@@ -15,28 +17,36 @@ import java.util.function.Function;
 @Component
 public class JwtUtils {
 
-    // UPDATE: In 0.12+, Keys.secretKeyFor is replaced. We now use Jwts.SIG.
-    private final SecretKey key = Jwts.SIG.HS256.key().build();
+    // Pulling the properties exactly as named in application.properties
+    @Value("${app.jwt.secret}")
+    private String jwtSecret;
 
-    // HARDCODED DEFAULT: To prevent unit test failure when Spring isn't loaded
-    @Value("${jwt.expiration:86400000}")
-    private long jwtExpirationMs = 86400000L;
+    @Value("${app.jwt.expiration-ms:86400000}")
+    private long jwtExpirationMs;
+
+    // Helper method to decode the base64 secret from properties into a valid SecretKey
+    private SecretKey getSigningKey() {
+        byte[] keyBytes = Decoders.BASE64.decode(jwtSecret);
+        return Keys.hmacShaKeyFor(keyBytes);
+    }
 
     public String generateToken(String email, String role, String userId) {
         return Jwts.builder()
-                .subject(email) // UPDATE: setSubject() is now subject()
+                .subject(email)
                 .claim("role", role)
                 .claim("userId", userId)
-                .issuedAt(new Date()) // UPDATE: setIssuedAt() is now issuedAt()
-                .expiration(new Date(System.currentTimeMillis() + jwtExpirationMs)) // UPDATE: setExpiration() is now expiration()
-                .signWith(key)
+                .issuedAt(new Date())
+                .expiration(new Date(System.currentTimeMillis() + jwtExpirationMs))
+                .signWith(getSigningKey()) // Using the persistent key
                 .compact();
     }
 
     public boolean validateJwtToken(String authToken) {
         try {
-            // UPDATE: parserBuilder() is gone. Replaced by parser().verifyWith()
-            Jwts.parser().verifyWith(key).build().parseSignedClaims(authToken);
+            Jwts.parser()
+                    .verifyWith(getSigningKey()) // Using the persistent key
+                    .build()
+                    .parseSignedClaims(authToken);
             return true;
         } catch (JwtException e) {
             log.error("Invalid JWT Token: {}", e.getMessage());
@@ -49,12 +59,11 @@ public class JwtUtils {
     }
 
     private <T> T extractClaim(String token, Function<Claims, T> claimsResolver) {
-        // UPDATE: Extracting claims also uses the new parser syntax
         final Claims claims = Jwts.parser()
-                .verifyWith(key)
+                .verifyWith(getSigningKey()) // Using the persistent key
                 .build()
                 .parseSignedClaims(token)
-                .getPayload(); // UPDATE: getBody() is now getPayload()
+                .getPayload();
         return claimsResolver.apply(claims);
     }
 }

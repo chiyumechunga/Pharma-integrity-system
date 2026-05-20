@@ -1,6 +1,7 @@
 package com.chiyumechunga.backend.service;
 
 import com.chiyumechunga.backend.dto.ProductRequestDto;
+import com.chiyumechunga.backend.dto.ProductResponseDto;
 import com.chiyumechunga.backend.model.ProductMaster;
 
 import java.util.List;
@@ -22,4 +23,5 @@ public interface ProductMasterService {
     List<ProductMaster> getAllProducts();
 
     ProductMaster getProductById(UUID productId);
+    List<ProductResponseDto> getPendingProducts();
 }

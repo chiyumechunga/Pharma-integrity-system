@@ -1,7 +1,8 @@
 package com.chiyumechunga.backend.controller;
 
-import com.chiyumechunga.backend.dto.provenance.FullProvenanceDto;
+import com.chiyumechunga.backend.dto.provenance.ProductDetailsDto;
 import com.chiyumechunga.backend.dto.provenance.ProvenanceEventDto;
+import com.chiyumechunga.backend.dto.provenance.ProvenanceResponseDto;
 import com.chiyumechunga.backend.service.ProvenanceService;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.HttpHeaders;
@@ -26,26 +27,14 @@ public class ProvenanceController {
         this.provenanceService = provenanceService;
     }
 
-    /**
-     * Public Endpoint: View the full lifecycle of a product.
-     * Includes OUTPUT SANITIZATION to prevent Stored XSS.
-     */
     @GetMapping("/{qrHash}")
-    public ResponseEntity<FullProvenanceDto> getProductHistory(@PathVariable String qrHash) {
-        // 1. INPUT SANITIZATION (Prevent Injection Attacks)
+    public ResponseEntity<ProvenanceResponseDto> getProductHistory(@PathVariable String qrHash) {
         String safeQrHash = sanitizeStrict(qrHash);
-
         log.info("Provenance request for QR: {}", safeQrHash);
 
-        // 2. EXECUTE READ (Get potentially tainted data from DB)
-        FullProvenanceDto rawHistory = provenanceService.getProvenance(safeQrHash);
+        ProvenanceResponseDto rawHistory = provenanceService.getProvenance(safeQrHash);
+        ProvenanceResponseDto safeHistory = sanitizeResponse(rawHistory);
 
-        // 3. OUTPUT SANITIZATION (The Fix for the Security Tool)
-        // We explicitly escape every string coming from the DB before sending it to the client.
-        // This breaks the "Stored XSS" taint chain.
-        FullProvenanceDto safeHistory = sanitizeResponse(rawHistory);
-
-        // 4. SECURITY HEADERS
         HttpHeaders headers = new HttpHeaders();
         headers.add("X-Content-Type-Options", "nosniff");
         headers.setContentType(MediaType.APPLICATION_JSON);
@@ -56,38 +45,51 @@ public class ProvenanceController {
     }
 
     /**
-     * Helper: Recursively sanitizes the DTO to render scripts harmless.
-     * e.g. "<script>" becomes "&lt;script&gt;"
+     * Helper: Recursively sanitizes the nested DTO structure to prevent XSS.
      */
-    private FullProvenanceDto sanitizeResponse(FullProvenanceDto input) {
+    private ProvenanceResponseDto sanitizeResponse(ProvenanceResponseDto input) {
         if (input == null) return null;
 
-        // 1. Sanitize the List of Events
-        List<ProvenanceEventDto> safeEvents = input.history().stream()
+        // 1. Sanitize Product Details (Null-safe)
+        ProductDetailsDto safeDetails = new ProductDetailsDto(
+                safeEscape(input.productDetails().genericName()),
+                safeEscape(input.productDetails().batchNumber()),
+                safeEscape(input.productDetails().manufacturer()),
+                input.productDetails().serialNumber(), // Preserved as raw if not a String
+                input.productDetails().expiryDate(),
+                safeEscape(input.productDetails().currentStatus())
+        );
+
+        // 2. Sanitize the Timeline Events (Null-safe)
+        List<ProvenanceEventDto> safeEvents = input.provenanceTimeline().stream()
                 .map(e -> new ProvenanceEventDto(
-                        HtmlUtils.htmlEscape(e.eventType()),
-                        HtmlUtils.htmlEscape(e.fromParticipant()), // Critical: User names are high-risk
-                        HtmlUtils.htmlEscape(e.toParticipant()),
-                        e.timestamp(),
-                        HtmlUtils.htmlEscape(e.blockchainTxId())
+                        e.eventTimestamp(),
+                        safeEscape(e.eventType()),
+                        safeEscape(e.fromParticipant()),
+                        safeEscape(e.fromParticipantName()),
+                        safeEscape(e.toParticipant()),
+                        safeEscape(e.toParticipantName()),
+                        safeEscape(e.blockchainTxId())
                 )).toList();
 
-        // 2. Sanitize the Parent DTO
-        return new FullProvenanceDto(
-                HtmlUtils.htmlEscape(input.productName()),
-                HtmlUtils.htmlEscape(input.batchNumber()),
-                HtmlUtils.htmlEscape(input.manufacturerName()),
-                input.expiryDate(), // Safe: LocalDate cannot hold scripts
-                HtmlUtils.htmlEscape(input.currentStatus()),
+        // 3. Assemble the Safe Root DTO
+        return new ProvenanceResponseDto(
+                safeEscape(input.verificationStatus()),
+                input.scanTimestamp(),
+                safeDetails,
                 safeEvents
         );
     }
 
-    /**
-     * Strict Sanitizer for URL parameters.
-     */
     private String sanitizeStrict(String input) {
         if (input == null) return "";
         return input.replaceAll("[^a-zA-Z0-9-_]", "");
+    }
+
+    /**
+     * Null-safe HTML escape helper.
+     */
+    private String safeEscape(String input) {
+        return input != null ? HtmlUtils.htmlEscape(input) : "N/A";
     }
 }

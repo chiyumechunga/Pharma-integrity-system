@@ -1,5 +1,6 @@
 package com.chiyumechunga.backend.model;
 
+import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import jakarta.persistence.*;
 import lombok.Data;
 import lombok.NoArgsConstructor;
@@ -19,18 +20,26 @@ public class ChainOfCustodyEvent {
     @Column(name = "event_id")
     private UUID eventId;
 
-    // FIX: Changed variable name from "product" to "registry".
-    // Lombok @Data will now automatically create setRegistry() and getRegistry().
-    @ManyToOne
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JsonIgnoreProperties({"hibernateLazyInitializer", "handler"})
     @JoinColumn(name = "registry_id", nullable = false)
     private PharmaceuticalRegistry registry;
 
-    @ManyToOne
+    // NEW: Map the specific item-level unit
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JsonIgnoreProperties({"hibernateLazyInitializer", "handler"})
+    @JoinColumn(name = "unit_id")
+    private SerializedUnit unit;
+
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JsonIgnoreProperties({"hibernateLazyInitializer", "handler"})
     @JoinColumn(name = "from_participant_id")
     private SupplyChainParticipant fromParticipant;
 
-    @ManyToOne
-    @JoinColumn(name = "to_participant_id", nullable = false)
+    // REMOVED 'nullable = false'. A patient receiving a dispensed drug is not a tracked participant.
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JsonIgnoreProperties({"hibernateLazyInitializer", "handler"})
+    @JoinColumn(name = "to_participant_id")
     private SupplyChainParticipant toParticipant;
 
     @Column(name = "event_type", nullable = false)
@@ -45,5 +54,4 @@ public class ChainOfCustodyEvent {
 
     @Column(name = "quantity")
     private Integer quantity;
-
 }

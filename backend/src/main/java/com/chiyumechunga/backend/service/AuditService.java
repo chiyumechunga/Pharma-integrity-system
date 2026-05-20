@@ -2,38 +2,20 @@ package com.chiyumechunga.backend.service;
 
 import com.chiyumechunga.backend.model.PharmaceuticalRegistry;
 import com.chiyumechunga.backend.model.ProductVerification;
-import com.chiyumechunga.backend.repository.ProductVerificationRepository;
-import lombok.extern.slf4j.Slf4j;
-import org.springframework.scheduling.annotation.Async;
-import org.springframework.stereotype.Service;
-import org.springframework.transaction.annotation.Propagation;
-import org.springframework.transaction.annotation.Transactional;
+import com.chiyumechunga.backend.model.SerializedUnit;
 
-@Slf4j
-@Service
-public class AuditService {
+import java.util.List;
 
-    private final ProductVerificationRepository verificationRepository;
+public interface AuditService {
 
-    public AuditService(ProductVerificationRepository verificationRepository) {
-        this.verificationRepository = verificationRepository;
-    }
+    /**
+     * Asynchronously records a product scan event without blocking the main user thread.
+     */
 
-    // @Async here works perfectly because it's called from a different class (VerificationServiceImpl)
-    @Async
-    @Transactional(propagation = Propagation.REQUIRES_NEW)
-    public void logScanAsync(PharmaceuticalRegistry product, String deviceId, String geo, String status) {
-        try {
-            ProductVerification scan = new ProductVerification();
-            scan.setPharmaceuticalRegistry(product);
-            scan.setDeviceFingerprint(deviceId);
-            scan.setGeoLocation(geo);
-            scan.setVerificationStatus(status);
-            scan.setScannedByRole("USER");
-            verificationRepository.save(scan);
-            log.info("Audit log saved asynchronously for product: {}", product.getProductName());
-        } catch (Exception e) {
-            log.error("Failed to save audit log", e);
-        }
-    }
+    void logScanAsync(PharmaceuticalRegistry batch, SerializedUnit unit, String deviceFingerprint, String geo, String status, String role);
+
+    /**
+     * Retrieves the complete history of all product verifications for the admin dashboard.
+     */
+    List<ProductVerification> getAllAuditLogs();
 }

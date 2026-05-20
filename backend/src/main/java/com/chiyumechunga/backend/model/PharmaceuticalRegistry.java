@@ -1,5 +1,7 @@
 package com.chiyumechunga.backend.model;
 
+import com.fasterxml.jackson.annotation.JsonIgnore;
+import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import jakarta.persistence.*;
 import lombok.Data;
 import lombok.NoArgsConstructor;
@@ -7,6 +9,7 @@ import lombok.AllArgsConstructor;
 import org.hibernate.annotations.CreationTimestamp;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
+import java.util.List;
 import java.util.UUID;
 
 @Entity
@@ -25,6 +28,7 @@ public class PharmaceuticalRegistry {
     private String qrHash;
 
     // --- NEW: LINK TO PRODUCT MASTER ---
+    @JsonIgnoreProperties({"hibernateLazyInitializer", "handler"})
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "product_id")
     private ProductMaster product;
@@ -36,6 +40,10 @@ public class PharmaceuticalRegistry {
     @Column(name = "batch_number")
     private String batchNumber;
 
+    @Column(name = "batch_unit_count", nullable = false)
+    private Integer batchUnitCount = 20;
+
+    @JsonIgnoreProperties({"hibernateLazyInitializer", "handler"})
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "manufacturer_id")
     private SupplyChainParticipant manufacturer;
@@ -61,4 +69,5 @@ public class PharmaceuticalRegistry {
 
     @Column(name = "confirmed_at")
     private LocalDateTime confirmedAt;
+
 }

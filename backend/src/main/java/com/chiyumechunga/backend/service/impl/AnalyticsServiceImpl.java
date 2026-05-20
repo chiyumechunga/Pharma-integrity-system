@@ -3,103 +3,77 @@ package com.chiyumechunga.backend.service.impl;
 import com.chiyumechunga.backend.dto.DashboardStatsDto;
 import com.chiyumechunga.backend.dto.analytics.ExpiryRiskDto;
 import com.chiyumechunga.backend.dto.analytics.LabQualityReportDto;
-import com.chiyumechunga.backend.dto.analytics.SuspiciousScanDto;
-import com.chiyumechunga.backend.repository.ChainOfCustodyRepository;
+import com.chiyumechunga.backend.repository.AnalyticsRepository;
 import com.chiyumechunga.backend.repository.PharmaceuticalRegistryRepository;
-import com.chiyumechunga.backend.repository.ProductVerificationRepository;
 import com.chiyumechunga.backend.repository.RegulatoryScrutinyRepository;
-import com.chiyumechunga.backend.repository.SupplyChainParticipantRepository;
 import com.chiyumechunga.backend.service.AnalyticsService;
+
 import lombok.RequiredArgsConstructor;
-import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 
 import java.math.BigDecimal;
-import java.math.RoundingMode;
 import java.time.LocalDate;
 import java.time.temporal.ChronoUnit;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
 import java.util.stream.Collectors;
 
-@Slf4j
 @Service
 @RequiredArgsConstructor
 public class AnalyticsServiceImpl implements AnalyticsService {
 
-    private final ProductVerificationRepository verificationRepo;
+    // 1. Inject the AnalyticsRepository for Dashboard/Trends (using optimized DB Views)
+    private final AnalyticsRepository analyticsRepository;
+
+    // 2. Keep the existing repositories needed for Expiry/Quality reports
     private final PharmaceuticalRegistryRepository registryRepo;
     private final RegulatoryScrutinyRepository scrutinyRepo;
-    private final SupplyChainParticipantRepository participantRepo;
-    private final ChainOfCustodyRepository custodyRepo; // Added for transfer stats
 
     /**
-     * D. EXECUTIVE OVERVIEW
-     * Logic: Aggregates all 8 KPIs required by the DashboardStatsDto.
+     * 1. EXECUTIVE OVERVIEW (Pulling directly from vw_poc_dashboard view)
      */
     @Override
     public DashboardStatsDto getDashboardOverview() {
-        // 1. Batch Stats
-        long authenticBatches = registryRepo.countByCurrentStatus("CONFIRMED"); // or "ON_CHAIN" depending on your flow
-        long pendingBatches = registryRepo.countByCurrentStatus("PENDING_BLOCKCHAIN");
-        long failedBatches = registryRepo.countByCurrentStatus("BLOCKCHAIN_FAILED");
+        Map<String, Object> data = analyticsRepository.getDashboardStats();
 
-        // 2. Scan Stats
-        long totalScans = verificationRepo.count();
-        long authenticScans = verificationRepo.countByVerificationStatus("AUTHENTIC");
-        long flaggedScans = totalScans - authenticScans; // Expired, Counterfeit, etc.
-
-        // 3. Authenticity Rate Calculation
-        BigDecimal authenticityRate = BigDecimal.ZERO;
-        if (totalScans > 0) {
-            authenticityRate = BigDecimal.valueOf(authenticScans)
-                    .multiply(BigDecimal.valueOf(100))
-                    .divide(BigDecimal.valueOf(totalScans), 2, RoundingMode.HALF_UP);
+        // Safely map the database view columns to the DTO
+        // We use ((Number) ...).longValue() to prevent ClassCastExceptions from Postgres BigInts
+        if (data == null || data.isEmpty()) {
+            return new DashboardStatsDto(0L, 0L, 0L, 0L, 0L, BigDecimal.ZERO, 0L, BigDecimal.ZERO);
         }
 
-        // 4. Activity Stats
-        long totalTransfers = custodyRepo.count();
-
-        // FIX: Initialize as BigDecimal to match new DTO signature
-        BigDecimal avgLatency = BigDecimal.ZERO;
-
-        // 5. Return Full DTO (8 Arguments)
         return new DashboardStatsDto(
-                authenticBatches,
-                pendingBatches,
-                failedBatches,
-                authenticScans,
-                flaggedScans,
-                authenticityRate,
-                totalTransfers,
-                avgLatency
+                ((Number) data.getOrDefault("authentic_batches_tracked", 0)).longValue(),
+                ((Number) data.getOrDefault("pending_confirmation", 0)).longValue(),
+                ((Number) data.getOrDefault("sync_failures", 0)).longValue(),
+                ((Number) data.getOrDefault("authentic_scans", 0)).longValue(),
+                ((Number) data.getOrDefault("flagged_scans", 0)).longValue(),
+                (BigDecimal) data.getOrDefault("authenticity_rate_pct", BigDecimal.ZERO),
+                ((Number) data.getOrDefault("custody_transfers", 0)).longValue(),
+                (BigDecimal) data.getOrDefault("avg_sync_latency_seconds", BigDecimal.ZERO)
         );
     }
 
     /**
-     * SECURITY ALERTS
+     * 2. SECURITY ALERTS (Pulling directly from vw_suspicious_patterns view)
      */
     @Override
-    public List<SuspiciousScanDto> getSuspiciousScanAlerts() {
-        List<Object[]> anomalies = verificationRepo.findPotentialClones();
-        List<SuspiciousScanDto> alerts = new ArrayList<>();
-
-        for (Object[] row : anomalies) {
-            String qrHash = row[0].toString();
-            long count = ((Number) row[1]).longValue();
-
-            alerts.add(new SuspiciousScanDto(
-                    qrHash,
-                    count,
-                    "High Scan Volume (Potential Clone)",
-                    LocalDate.now().toString()
-            ));
-        }
-        return alerts;
+    public List<Map<String, Object>> getSuspiciousPatterns() {
+        return analyticsRepository.getSuspiciousPatterns();
     }
 
     /**
-     * EXPIRY RISK
+     * 3. VERIFICATION TRENDS (Pulling directly from vw_verification_trends view)
+     */
+    @Override
+    public List<Map<String, Object>> getVerificationTrends() {
+        return analyticsRepository.getVerificationTrends();
+    }
+
+    /**
+     * 4. EXPIRY RISK
+     * Accounting for secondary packaging (batches) and their primary packaging (units)
      */
     @Override
     public List<ExpiryRiskDto> getExpiryRiskOverview(int daysThreshold) {
@@ -107,19 +81,20 @@ public class AnalyticsServiceImpl implements AnalyticsService {
 
         return registryRepo.findAll().stream()
                 .filter(batch -> batch.getExpiryDate() != null && batch.getExpiryDate().isBefore(thresholdDate))
-                .filter(batch -> !"DISPENSED".equals(batch.getCurrentStatus()))
+                .filter(batch -> !"DISPENSED".equals(batch.getCurrentStatus()) && !"DESTROYED".equals(batch.getCurrentStatus()))
                 .map(batch -> new ExpiryRiskDto(
                         batch.getProductName(),
                         batch.getBatchNumber(),
                         batch.getExpiryDate(),
-                        "Unknown",
+                        // Include context about the primary packaging units contained within this batch
+                        "Contains " + batch.getBatchUnitCount() + " primary units at risk.",
                         ChronoUnit.DAYS.between(LocalDate.now(), batch.getExpiryDate())
                 ))
                 .collect(Collectors.toList());
     }
 
     /**
-     * QUALITY REPORTS
+     * 5. QUALITY REPORTS
      */
     @Override
     public List<LabQualityReportDto> getLabQualityStats() {

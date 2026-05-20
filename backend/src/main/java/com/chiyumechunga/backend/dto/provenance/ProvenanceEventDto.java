@@ -3,9 +3,11 @@ package com.chiyumechunga.backend.dto.provenance;
 import java.time.LocalDateTime;
 
 public record ProvenanceEventDto(
-        String eventType,       // e.g. "MANUFACTURED", "RECEIVED"
-        String fromParticipant, // Name of sender (or "N/A")
-        String toParticipant,   // Name of receiver
-        LocalDateTime timestamp,
-        String blockchainTxId   // The immutable proof
-) {}
+        LocalDateTime eventTimestamp,
+        String eventType,
+        String fromParticipant,       // The raw hash
+        String fromParticipantName,   // NEW: The human-readable name
+        String toParticipant,         // The raw hash
+        String toParticipantName, // NEW: The human-readable
+        String blockchainTxId ) {}
+

@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { Html5QrcodeScanner } from 'html5-qrcode';
-import { useNavigate } from 'react-router-dom'; // 1. Import useNavigate
+import { useNavigate } from 'react-router-dom';
 import styles from './CustodyTransfer.module.css';
 import { apiClient } from "../../services/apiClient.js";
 import { useMutation, useQuery } from "@tanstack/react-query";
@@ -8,18 +8,10 @@ import { useAuth } from '../auth/AuthContext';
 
 export default function CustodyTransfer() {
     const { user, logout } = useAuth();
-    const navigate = useNavigate(); // 2. Initialize navigation stack
+    const navigate = useNavigate(); // Initialize navigation stack
     const [isScanning, setIsScanning] = useState(false);
     const [scannedBatch, setScannedBatch] = useState('');
     const [selectedRecipient, setSelectedRecipient] = useState('');
-
-    // Determine the safe "pop" destination based on the user's origin node
-    const getBackPath = () => {
-        if (user?.role === 'MANUFACTURER') return '/manufacturer';
-        if (user?.role === 'PHARMACY') return '/pharmacy';
-        return null; // ZAMMSA stays here, no back button rendered
-    };
-    const backPath = getBackPath();
 
     const { data: participants } = useQuery({
         queryKey: ['participants'],
@@ -77,31 +69,29 @@ export default function CustodyTransfer() {
         <div className={styles.container}>
             <header className={styles.header}>
                 <div>
-                    {/* 3. The Dynamic Back Button (Stack Pop) */}
-                    {backPath && (
-                        <button
-                            onClick={() => navigate(backPath)}
-                            style={{
-                                display: 'inline-flex',
-                                alignItems: 'center',
-                                gap: '8px',
-                                background: 'none',
-                                border: 'none',
-                                color: 'var(--on-surface-variant)',
-                                cursor: 'pointer',
-                                fontWeight: '600',
-                                fontFamily: 'var(--font-ui)',
-                                padding: 0,
-                                marginBottom: '16px',
-                                transition: 'color 0.2s'
-                            }}
-                            onMouseEnter={(e) => e.currentTarget.style.color = 'var(--primary)'}
-                            onMouseLeave={(e) => e.currentTarget.style.color = 'var(--on-surface-variant)'}
-                        >
-                            <span className="material-symbols-outlined" style={{ fontSize: '18px' }}>arrow_back</span>
-                            Back to Dashboard
-                        </button>
-                    )}
+                    {/* The Dynamic Back Button (History Stack Pop) */}
+                    <button
+                        onClick={() => navigate(-1)}
+                        style={{
+                            display: 'inline-flex',
+                            alignItems: 'center',
+                            gap: '8px',
+                            background: 'none',
+                            border: 'none',
+                            color: 'var(--on-surface-variant)',
+                            cursor: 'pointer',
+                            fontWeight: '600',
+                            fontFamily: 'var(--font-ui)',
+                            padding: 0,
+                            marginBottom: '16px',
+                            transition: 'color 0.2s'
+                        }}
+                        onMouseEnter={(e) => e.currentTarget.style.color = 'var(--primary)'}
+                        onMouseLeave={(e) => e.currentTarget.style.color = 'var(--on-surface-variant)'}
+                    >
+                        <span className="material-symbols-outlined" style={{ fontSize: '18px' }}>arrow_back</span>
+                        Back to Dashboard
+                    </button>
 
                     <h1 className={styles.title}>Handover</h1>
                     <p className={styles.subtitle}>{user?.username} • {user?.role}</p>

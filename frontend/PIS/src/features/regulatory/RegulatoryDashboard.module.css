@@ -1,179 +1,270 @@
 /* src/features/regulatory/RegulatoryDashboard.module.css */
 
-.container {
-    max-width: 1200px;
-    margin: 0 auto;
-    padding: 32px 24px;
+/* ── Global Fixes for the Module ── */
+.dashboardWrapper * {
+    box-sizing: border-box;
+}
+
+/* ── Dashboard Shell ── */
+.dashboardWrapper {
+    display: flex;
+    height: 100vh; /* Lock height to prevent entire page scrolling */
+    background-color: var(--surface, #f4f7f6);
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+    overflow: hidden;
+}
+
+.sidebar {
+    width: 260px;
+    flex-shrink: 0; /* CRITICAL: Prevents sidebar from squishing */
+    background-color: var(--primary, #004d61);
+    color: white;
+    padding: 32px 16px;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    box-shadow: 2px 0 12px rgba(0,0,0,0.1);
+    z-index: 10;
+}
+
+.sidebarBrand {
+    font-size: 18px;
+    font-weight: 700;
+    margin-bottom: 32px;
+    padding: 0 12px;
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    line-height: 1.3;
+}
+
+.navItem {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 12px 16px;
+    border-radius: 8px;
+    cursor: pointer;
+    font-size: 14px;
+    font-weight: 500;
+    transition: all 0.2s ease;
+}
+
+.navItem:hover { background: rgba(255,255,255,0.1); }
+.activeNav { background: var(--primary-container, #0a9396); color: white; }
+
+/* ── Regulatory Specific Layout ── */
+.mainContent {
+    flex: 1;
+    min-width: 0; /* CRITICAL: Prevents flex child from expanding infinitely */
+    height: 100%;
+    overflow-y: auto;
+    padding: 40px 48px;
+}
+
+.contentGrid {
     display: grid;
-    grid-template-columns: 1fr 320px; /* Asymmetrical Layout: Main Content + Sidebar */
+    /* minmax(0, 1fr) is CRITICAL here so Recharts doesn't blow out the grid width */
+    grid-template-columns: minmax(0, 1fr) 320px;
     gap: 32px;
     align-items: start;
+    max-width: 1600px;
+    margin: 0 auto;
 }
 
-@media (max-width: 800px) {
-    .container {
-        grid-template-columns: 1fr;
-    }
-}
-
-/* Header Section */
 .header {
     grid-column: 1 / -1;
     display: flex;
     justify-content: space-between;
     align-items: flex-end;
-    margin-bottom: 24px;
+    margin-bottom: 32px;
+    border-bottom: 1px solid #e0e0e0;
+    padding-bottom: 16px;
 }
 
 .title {
-    font-size: 32px;
+    font-size: 28px;
     font-weight: 700;
-    color: var(--primary);
+    color: var(--primary, #004d61);
     letter-spacing: -0.02em;
+    margin: 0;
 }
 
 .subtitle {
-    font-family: var(--font-ui);
-    color: var(--on-surface-variant);
+    color: #6f797c;
     font-size: 14px;
+    margin-top: 6px;
+    font-weight: 500;
 }
 
 .userProfile {
     display: flex;
     align-items: center;
     gap: 12px;
-    font-family: var(--font-ui);
     font-weight: 600;
     font-size: 14px;
+    color: #333;
+    background: white;
+    padding: 8px 16px;
+    border-radius: 20px;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.05);
 }
 
-/* Metrics Grid */
+/* ── Metrics Grid (Top Dashboard) ── */
 .metricsGrid {
     display: grid;
     grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
     gap: 24px;
-    margin-bottom: 40px;
+    margin-bottom: 32px;
 }
 
 .metricCard {
     background: white;
-    border-radius: var(--radius-xl);
+    border-radius: 12px;
     padding: 24px;
-    box-shadow: 0 4px 20px rgba(0, 70, 85, 0.04);
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.03);
     position: relative;
     overflow: hidden;
+    border: 1px solid #eaeaea;
 }
 
 .metricCard::after {
     content: '';
     position: absolute;
-    bottom: 0;
-    left: 0;
-    width: 100%;
-    height: 4px;
-    background-color: var(--primary-container);
+    bottom: 0; left: 0;
+    width: 100%; height: 4px;
+    background-color: var(--primary-container, #0a9396);
 }
 
 .metricValue {
-    font-size: 36px;
+    font-size: 32px;
     font-weight: 700;
-    color: var(--primary);
+    color: var(--primary, #004d61);
     margin-top: 8px;
 }
 
 .metricLabel {
-    font-family: var(--font-ui);
-    font-size: 13px;
-    color: var(--on-surface-variant);
+    font-size: 12px;
+    color: #6f797c;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    font-weight: 600;
+}
+
+.warningText { color: #d62828; }
+
+/* ── NEW ANALYTICS STYLES ── */
+.analyticsWrapper {
+    display: flex;
+    flex-direction: column;
+    gap: 24px;
+}
+
+.analyticsHeader {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+
+.analyticsHeader h2 { margin: 0; color: var(--primary, #004d61); font-size: 20px;}
+.analyticsHeader p { margin: 4px 0 0; color: #6f797c; font-size: 14px; }
+
+.downloadBtn {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    background-color: var(--primary, #004d61);
+    color: white;
+    padding: 10px 16px;
+    border-radius: 8px;
+    border: none;
+    font-weight: 600;
+    cursor: pointer;
+    transition: opacity 0.2s;
+}
+.downloadBtn:hover { opacity: 0.9; }
+
+/* Sub-KPI Cards */
+.kpiGrid {
+    display: grid;
+    /* This allows the 4 items to wrap nicely on smaller screens */
+    grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+    gap: 16px;
+}
+
+.kpiCard {
+    background: white;
+    padding: 20px;
+    border-radius: 12px;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.02);
+    border: 1px solid #eaeaea;
+}
+
+.kpiCard h4 {
+    margin: 0 0 8px;
+    font-size: 12px;
+    color: #6f797c;
     text-transform: uppercase;
     letter-spacing: 0.05em;
 }
 
-.warningText {
-    color: #d62828; /* Status Recalled / Danger */
+.kpiCard h2 {
+    margin: 0;
+    font-size: 28px;
+    color: #1d1b20;
 }
 
-/* Emergency Recall Zone (Danger UI) */
-.dangerZone {
-    background: #fff5f5;
-    border: 1px solid rgba(214, 40, 40, 0.15);
-    border-radius: var(--radius-xl);
-    padding: 32px;
-    margin-bottom: 40px;
+.trendUp { color: #10b981; font-size: 18px; margin-left: 4px; }
+.dangerCard { border-left: 4px solid #d62828 !important; }
+.dangerCard h2 { color: #d62828; }
+
+/* Chart Layouts */
+.chartsGrid2 {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(350px, 1fr));
+    gap: 24px;
 }
 
-.dangerHeader {
-    display: flex;
-    align-items: center;
-    gap: 12px;
-    color: #d62828;
-    margin-bottom: 16px;
-}
-
-.dangerHeader h2 {
-    font-size: 20px;
-    font-weight: 700;
-}
-
-.dangerDescription {
-    font-family: var(--font-ui);
-    font-size: 14px;
-    color: var(--on-surface-variant);
-    margin-bottom: 24px;
-    max-width: 600px;
-    line-height: 1.5;
-}
-
-.recallForm {
-    display: flex;
-    gap: 16px;
-}
-
-.inputWrapper {
-    flex: 1;
-    max-width: 400px;
-}
-
-.input {
-    width: 100%;
+.chartCard {
     background: white;
-    border: 1px solid rgba(214, 40, 40, 0.2);
-    border-radius: var(--radius-lg);
-    padding: 16px;
-    font-family: var(--font-ui);
-    font-size: 16px;
-    outline: none;
-    transition: all 0.2s;
+    padding: 24px;
+    border-radius: 12px;
+    box-shadow: 0 4px 12px rgba(0,0,0,0.03);
+    border: 1px solid #eaeaea;
+    width: 100%;
 }
 
-.input:focus {
-    border-color: #d62828;
-    box-shadow: 0 0 0 3px rgba(214, 40, 40, 0.1);
+.analyticsTable {
+    width: 100%;
+    border-collapse: collapse;
 }
 
-.recallBtn {
-    background-color: #d62828;
-    color: white;
-    border: none;
-    border-radius: var(--radius-lg);
-    padding: 0 32px;
-    font-family: var(--font-ui);
+.analyticsTable th {
+    text-align: left;
+    padding: 14px 12px;
+    background: #f8f9fa;
+    border-bottom: 2px solid #eaeaea;
+    font-size: 13px;
+    color: #6f797c;
     font-weight: 600;
-    font-size: 14px;
-    cursor: pointer;
-    transition: background-color 0.2s;
 }
 
-.recallBtn:hover {
-    background-color: #b02020;
+.analyticsTable td {
+    padding: 14px 12px;
+    border-bottom: 1px solid #eaeaea;
+    font-size: 13px;
+    color: #1d1b20;
 }
 
-/* Live Network Alerts (Sidebar) */
+/* ── Live Alerts Panel (Right Sidebar) ── */
 .alertsPanel {
     background: white;
-    border-radius: var(--radius-xl);
+    border-radius: 12px;
     padding: 24px;
-    box-shadow: 0 4px 24px rgba(0, 70, 85, 0.03);
+    box-shadow: 0 4px 20px rgba(0,0,0,0.04);
+    border: 1px solid #eaeaea;
+    position: sticky;
+    top: 0; /* Sticks to the top of the scrolling main view */
 }
 
 .alertsHeader {
@@ -184,25 +275,25 @@
 }
 
 .alertsHeader h3 {
+    margin: 0;
     font-size: 16px;
-    color: var(--primary);
+    color: var(--primary, #004d61);
 }
 
 .pulseDot {
-    width: 8px;
-    height: 8px;
-    background-color: var(--primary-container);
+    width: 10px;
+    height: 10px;
+    background-color: var(--primary-container, #0a9396);
     border-radius: 50%;
     animation: pulse 2s infinite;
 }
 
 @keyframes pulse {
-    0% { box-shadow: 0 0 0 0 rgba(0, 95, 115, 0.4); }
-    70% { box-shadow: 0 0 0 6px rgba(0, 95, 115, 0); }
-    100% { box-shadow: 0 0 0 0 rgba(0, 95, 115, 0); }
+    0% { box-shadow: 0 0 0 0 rgba(10, 147, 150, 0.4); }
+    70% { box-shadow: 0 0 0 8px rgba(10, 147, 150, 0); }
+    100% { box-shadow: 0 0 0 0 rgba(10, 147, 150, 0); }
 }
 
-/* Timeline Implementation (No-Line Rule exception: vertical connector) */
 .timelineItem {
     display: flex;
     gap: 16px;
@@ -210,265 +301,54 @@
     position: relative;
 }
 
+.timelineItem:last-child {
+    margin-bottom: 0;
+}
+
 .timelineConnector {
     position: absolute;
     left: 3px;
-    top: 24px;
+    top: 20px;
     bottom: -24px;
     width: 2px;
-    background-color: var(--surface-container-high);
+    background-color: #e0e0e0;
+}
+
+.timelineItem:last-child .timelineConnector {
+    display: none;
 }
 
 .timelineDot {
     width: 8px;
     height: 8px;
     border-radius: 50%;
-    background-color: var(--primary-container);
+    background-color: var(--primary-container, #0a9396);
     margin-top: 6px;
     position: relative;
     z-index: 2;
 }
 
-.timelineDotAlert {
-    background-color: #d62828;
-}
+.timelineDotAlert { background-color: #d62828; }
 
 .timelineContent h4 {
     font-size: 13px;
     font-weight: 600;
-    margin-bottom: 2px;
+    margin: 0 0 4px 0;
+    color: #1d1b20;
 }
 
 .timelineContent p {
-    font-family: var(--font-ui);
-    font-size: 11px;
-    color: var(--on-surface-variant);
+    font-size: 12px;
+    color: #6f797c;
+    margin: 0 0 4px 0;
+    line-height: 1.4;
 }
 
-/* Logout Button */
-.logoutBtn {
-    background: transparent;
-    border: none;
-    color: var(--on-surface-variant);
-    cursor: pointer;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    padding: 8px;
-    border-radius: 50%;
-    transition: all 0.2s ease;
-}
-
-.logoutBtn:hover {
-    background-color: rgba(214, 40, 40, 0.1);
-    color: #d62828; /* Transforms to warning red on hover */
-}
-
-/* Lab Inspection Zone */
-.labZone {
-    background: white;
-    border: 1px solid var(--border);
-    border-radius: var(--radius-xl);
-    padding: 32px;
-    margin-bottom: 40px;
-    box-shadow: 0 4px 20px rgba(0, 70, 85, 0.04);
-}
-
-.labHeader {
-    display: flex;
-    align-items: center;
-    gap: 12px;
-    color: var(--primary);
-    margin-bottom: 16px;
-}
-
-.labHeader h2 {
-    font-size: 20px;
-    font-weight: 700;
-}
-
-.labDescription {
-    font-family: var(--font-ui);
-    font-size: 14px;
-    color: var(--on-surface-variant);
-    margin-bottom: 24px;
-    line-height: 1.5;
-}
-
-.formRow {
-    display: flex;
-    gap: 16px;
-    margin-bottom: 16px;
-}
-
-@media (max-width: 600px) {
-    .formRow {
-        flex-direction: column;
-    }
-}
-
-.labBtn {
-    background-color: var(--primary-container);
-    color: white;
-    border: none;
-    border-radius: var(--radius-lg);
-    padding: 14px 32px;
-    font-family: var(--font-ui);
-    font-weight: 600;
-    font-size: 14px;
-    cursor: pointer;
-    transition: background-color 0.2s;
-    align-self: flex-start;
-}
-
-.labBtn:hover {
-    background-color: var(--secondary);
-}
-
-.labBtn:disabled {
-    background-color: var(--surface-container-high);
-    color: var(--on-surface-variant);
-    cursor: not-allowed;
-}
-
-/* Ensure select inputs match standard inputs */
-select.input {
-    appearance: none;
-    background-image: url("data:image/svg+xml;charset=US-ASCII,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20width%3D%2224%22%20height%3D%2224%22%20viewBox%3D%220%200%2024%2024%22%20fill%3D%22none%22%20stroke%3D%22%236f797c%22%20stroke-width%3D%222%22%20stroke-linecap%3D%22round%22%20stroke-linejoin%3D%22round%22%3E%3Cpolyline%20points%3D%226%209%2012%2015%2018%209%22%3E%3C%2Fpolyline%3E%3C%2Fsvg%3E");
-    background-repeat: no-repeat;
-    background-position: right 16px center;
-    background-size: 16px;
-    cursor: pointer;
-}
-
-/* src/features/regulatory/RegulatoryDashboard.module.css */
-
-/* ── Dashboard Shell (Manufacturer Style) ── */
-.dashboardWrapper {
-    display: flex;
-    min-height: 100vh;
-    background-color: var(--surface);
-}
-
-.sidebar {
-    width: 260px;
-    background-color: var(--primary);
-    color: white;
-    padding: 32px 16px;
-    display: flex;
-    flex-direction: column;
-    gap: 8px;
-}
-
-.sidebarBrand {
-    font-size: 20px;
-    font-weight: 700;
-    margin-bottom: 32px;
-    padding: 0 12px;
-    display: flex;
-    align-items: center;
-    gap: 10px;
-}
-
-.navItem {
-    display: flex;
-    align-items: center;
-    gap: 12px;
-    padding: 12px;
-    border-radius: 8px;
-    cursor: pointer;
-    font-family: var(--font-ui);
-    font-size: 14px;
-    font-weight: 500;
-    transition: background 0.2s;
-}
-
-.navItem:hover { background: rgba(255,255,255,0.1); }
-.activeNav { background: var(--primary-container); }
-
-/* ── Regulatory Specific Layout ── */
-.mainContent {
-    flex: 1;
-    padding: 40px 48px;
-    overflow-y: auto;
-}
-
-/* Inner grid handles the main content + right sidebar alerts */
-.contentGrid {
-    display: grid;
-    grid-template-columns: 1fr 320px;
-    gap: 32px;
-    align-items: start;
-    max-width: 1400px;
-    margin: 0 auto;
-}
-
-.header {
-    grid-column: 1 / -1;
-    display: flex;
-    justify-content: space-between;
-    align-items: flex-end;
-    margin-bottom: 24px;
-}
-
-.title {
-    font-size: 32px;
-    font-weight: 700;
-    color: var(--primary);
-    letter-spacing: -0.02em;
-}
-
-.subtitle {
-    font-family: var(--font-ui);
-    color: var(--on-surface-variant);
-    font-size: 14px;
-}
-
-.metricsGrid {
-    display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
-    gap: 24px;
-    margin-bottom: 40px;
-}
-
-.metricCard {
-    background: white;
-    border-radius: var(--radius-xl);
-    padding: 24px;
-    box-shadow: 0 4px 20px rgba(0, 70, 85, 0.04);
-    position: relative;
-    overflow: hidden;
-}
-
-.metricCard::after {
-    content: '';
-    position: absolute;
-    bottom: 0;
-    left: 0;
-    width: 100%;
-    height: 4px;
-    background-color: var(--primary-container);
-}
-
-.metricValue {
-    font-size: 36px;
-    font-weight: 700;
-    color: var(--primary);
-    margin-top: 8px;
-}
-
-.metricLabel {
-    font-family: var(--font-ui);
-    font-size: 13px;
-    color: var(--on-surface-variant);
-    text-transform: uppercase;
-    letter-spacing: 0.05em;
-}
-
+/* ── Lab & Recall Zones ── */
 .dangerZone {
     background: #fff5f5;
-    border: 1px solid rgba(214, 40, 40, 0.15);
-    border-radius: var(--radius-xl);
+    border: 1px solid rgba(214, 40, 40, 0.2);
+    border-radius: 12px;
     padding: 32px;
     margin-bottom: 40px;
 }
@@ -481,83 +361,99 @@ select.input {
     margin-bottom: 16px;
 }
 
-.alertsPanel {
+.labZone {
     background: white;
-    border-radius: var(--radius-xl);
-    padding: 24px;
-    box-shadow: 0 4px 24px rgba(0, 70, 85, 0.03);
-    position: sticky;
-    top: 24px;
+    border: 1px solid #eaeaea;
+    border-radius: 12px;
+    padding: 32px;
+    box-shadow: 0 4px 12px rgba(0,0,0,0.02);
 }
 
-.alertsHeader {
+.labHeader { display: flex; align-items: center; gap: 12px; color: var(--primary, #004d61); margin-bottom: 16px; }
+
+.formRow { display: flex; gap: 16px; margin-bottom: 16px; }
+.inputWrapper { flex: 1; }
+.input {
+    width: 100%;
+    background: #f8f9fa;
+    border: 1px solid #d1d5db;
+    border-radius: 8px;
+    padding: 12px 16px;
+    font-size: 14px;
+    outline: none;
+    transition: border 0.2s;
+}
+.input:focus { border-color: var(--primary-container, #0a9396); }
+
+.labBtn {
+    background-color: var(--primary-container, #0a9396);
+    color: white;
+    border: none;
+    border-radius: 8px;
+    padding: 12px 24px;
+    font-weight: 600;
+    cursor: pointer;
+    font-size: 14px;
+}
+
+.recallBtn {
+    background-color: #d62828;
+    color: white;
+    border: none;
+    border-radius: 8px;
+    padding: 12px 24px;
+    font-weight: 600;
+    cursor: pointer;
+    font-size: 14px;
+}
+
+.logoutBtn {
+    background: transparent;
+    border: none;
+    color: rgba(255,255,255,0.7);
+    cursor: pointer;
     display: flex;
-    justify-content: space-between;
     align-items: center;
-    margin-bottom: 24px;
+    justify-content: flex-start;
+    padding: 12px 16px;
+    border-radius: 8px;
 }
+.logoutBtn:hover { background-color: rgba(214, 40, 40, 0.8); color: white; }
 
-.timelineItem {
-    display: flex;
-    gap: 16px;
-    margin-bottom: 24px;
-    position: relative;
-}
-
-.timelineDot {
-    width: 8px;
-    height: 8px;
-    border-radius: 50%;
-    background-color: var(--primary-container);
-    margin-top: 6px;
-}
-
-/* ── Mobile Responsiveness ── */
-@media (max-width: 900px) {
+/* ── Mobile & Tablet Responsiveness ── */
+@media (max-width: 1200px) {
     .contentGrid {
-        grid-template-columns: 1fr; /* Stack alerts panel below main metrics on smaller screens */
+        grid-template-columns: 1fr; /* Drop right-sidebar to bottom on tablets */
     }
-
     .alertsPanel {
-        position: relative;
-        top: 0;
+        position: static;
+    }
+    .chartsGrid2 {
+        grid-template-columns: 1fr;
     }
 }
 
 @media (max-width: 768px) {
-    .dashboardWrapper {
-        flex-direction: column;
-        padding-bottom: 80px; /* Room for bottom nav */
-    }
+    .dashboardWrapper { flex-direction: column; height: auto; padding-bottom: 80px; }
 
     .sidebar {
         width: 100%;
         flex-direction: row;
         align-items: center;
-        padding: 16px;
-        gap: 12px;
-        overflow-x: auto;
-        white-space: nowrap;
+        padding: 12px 16px;
         position: fixed;
-        bottom: 0;
-        left: 0;
-        right: 0;
+        bottom: 0; left: 0;
         z-index: 1000;
-        box-shadow: 0 -4px 20px rgba(0, 0, 0, 0.15);
-        -ms-overflow-style: none;
-        scrollbar-width: none;
+        overflow-x: auto;
+        box-shadow: 0 -2px 12px rgba(0,0,0,0.15);
     }
+    .sidebarBrand { display: none; }
 
-    .sidebar::-webkit-scrollbar { display: none; }
-    .sidebarBrand { margin-bottom: 0; padding: 0; margin-right: 8px; }
-    .sidebarBrand span:last-child { display: none; }
-    .navItem { padding: 8px 16px; font-size: 13px; }
-    .navItem:last-child { margin-top: 0 !important; margin-left: auto; }
+    .mainContent { padding: 24px 16px; height: auto; overflow: visible; }
 
-    .mainContent { padding: 24px 16px; }
     .title { font-size: 24px; }
+    .formRow { flex-direction: column; }
 
-    .dangerZone { padding: 24px 16px; }
-    .recallForm { flex-direction: column; }
-    .inputWrapper { max-width: 100%; }
+    .kpiGrid { grid-template-columns: 1fr 1fr; } /* 2x2 grid on mobile */
+    .header { flex-direction: column; align-items: flex-start; gap: 16px; }
 }

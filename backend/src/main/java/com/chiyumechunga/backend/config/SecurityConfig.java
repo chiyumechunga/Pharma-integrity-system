@@ -43,6 +43,7 @@ public class SecurityConfig {
                         // We use hasAuthority() because your token says "MANUFACTURER", not "ROLE_MANUFACTURER"
                         .requestMatchers("/api/v1/registry/**").hasAuthority("MANUFACTURER")
 
+                        .requestMatchers("/api/v1/firefly/**").permitAll()
                         // All other endpoints require at least a valid login
                         .anyRequest().authenticated()
                 )
@@ -56,14 +57,21 @@ public class SecurityConfig {
     @Bean
     public CorsConfigurationSource corsConfigurationSource() {
         CorsConfiguration configuration = new CorsConfiguration();
-        configuration.setAllowedOrigins(List.of(
+
+        // THE FIX: Switch from setAllowedOrigins to setAllowedOriginPatterns
+        configuration.setAllowedOriginPatterns(List.of(
                 "http://localhost:5173",
-                "http://localhost:3000",
-                "http://192.168.0.142:5173"
+                "https://localhost:5173",// Local machine
+                "http://192.168.*:5173",   // Any IP from your ZTE Mobile WiFi Router
+                "https://192.168.*:5173",
+                "http://10.*:5173",        // Any dynamic IP from your Mobile Hotspot
+                "https://10.*:5173"
         ));
+
         configuration.setAllowedMethods(List.of("GET", "POST", "PUT", "DELETE", "OPTIONS"));
         configuration.setAllowedHeaders(List.of("*"));
         configuration.setAllowCredentials(true);
+
         UrlBasedCorsConfigurationSource source = new UrlBasedCorsConfigurationSource();
         source.registerCorsConfiguration("/**", configuration);
         return source;

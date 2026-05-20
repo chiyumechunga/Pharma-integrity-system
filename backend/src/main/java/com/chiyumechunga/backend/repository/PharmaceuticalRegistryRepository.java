@@ -11,7 +11,6 @@ import java.util.UUID;
 
 @Repository
 public interface PharmaceuticalRegistryRepository extends JpaRepository<PharmaceuticalRegistry, UUID> {
-
     Optional<PharmaceuticalRegistry> findByQrHash(String qrHash);
     boolean existsByQrHash(String qrHash);
     long countByCurrentStatus(String status);
@@ -19,13 +18,12 @@ public interface PharmaceuticalRegistryRepository extends JpaRepository<Pharmace
     boolean existsByBatchNumber(String batchNumber);
 
     // Dynamic Custody Resolution
-    // This query evaluates the supply chain history to find the *current* owner.
     @Query(value = """
         WITH target_registry AS (
-            -- 1. Grab any item belonging to this batch
+            -- 1. Grab the specific item using the scanned QR Hash
             SELECT registry_id, manufacturer_id 
             FROM pharmaceutical_registry 
-            WHERE batch_number = :batchNumber 
+            WHERE qr_hash = :scannedIdentifier 
             LIMIT 1
         ),
         latest_custody AS (
@@ -41,12 +39,12 @@ public interface PharmaceuticalRegistryRepository extends JpaRepository<Pharmace
             FROM target_registry t
             LEFT JOIN latest_custody c ON true
             WHERE 
-                -- Condition A: The drug has moved before, and the sender was the last person to receive it (e.g., ZAMMSA)
+                -- Condition A: The drug has moved before, and the sender was the last person to receive it
                 (c.to_participant_id IS NOT NULL AND c.to_participant_id = :senderId)
                 OR 
                 -- Condition B: The drug has never moved, so the sender must be the original Manufacturer
                 (c.to_participant_id IS NULL AND t.manufacturer_id = :senderId)
         )
     """, nativeQuery = true)
-    boolean isBatchOwnedBy(@Param("batchNumber") String batchNumber, @Param("senderId") UUID senderId);
+    boolean isBatchOwnedBy(@Param("scannedIdentifier") String scannedIdentifier, @Param("senderId") UUID senderId);
 }

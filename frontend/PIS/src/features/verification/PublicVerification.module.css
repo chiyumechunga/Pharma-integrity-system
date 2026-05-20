@@ -291,3 +291,21 @@
     border-radius: 4px;
     display: inline-block;
 }
+
+.inputField {
+    width: 100%;
+    padding: 14px;
+    border: 1px solid #d1d5db;
+    border-radius: 8px;
+    font-family: inherit;
+    font-size: 14px;
+    background-color: #f9fafb;
+    color: #333;
+    outline: none;
+    transition: border-color 0.2s;
+}
+
+.inputField:focus {
+    border-color: var(--primary-container, #0a9396);
+    background-color: #fff;
+}

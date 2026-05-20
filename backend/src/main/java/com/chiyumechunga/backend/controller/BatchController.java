@@ -2,8 +2,9 @@ package com.chiyumechunga.backend.controller;
 
 import com.chiyumechunga.backend.dto.FireflyAckDto;
 import com.chiyumechunga.backend.dto.RegistryRequestDto;
-import com.chiyumechunga.backend.dto.provenance.FullProvenanceDto;
+import com.chiyumechunga.backend.dto.provenance.ProvenanceResponseDto;
 import com.chiyumechunga.backend.model.PharmaceuticalRegistry;
+import com.chiyumechunga.backend.repository.PharmaceuticalRegistryRepository;
 import com.chiyumechunga.backend.service.ProvenanceService;
 import com.chiyumechunga.backend.service.RegistryService;
 import com.google.zxing.BarcodeFormat;
@@ -19,6 +20,8 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
 import java.io.ByteArrayOutputStream;
+import java.util.List;
+import java.util.Optional;
 
 @Slf4j
 @RestController
@@ -27,10 +30,12 @@ public class BatchController {
 
     private final RegistryService registryService;
     private final ProvenanceService provenanceService;
+    private final PharmaceuticalRegistryRepository registryRepository;
 
-    public BatchController(RegistryService registryService, ProvenanceService provenanceService) {
+    public BatchController(RegistryService registryService, ProvenanceService provenanceService, PharmaceuticalRegistryRepository registryRepository) {
         this.registryService = registryService;
         this.provenanceService = provenanceService;
+        this.registryRepository = registryRepository;
     }
 
     /**
@@ -51,7 +56,8 @@ public class BatchController {
                 sanitizeStrict(request.batchNumber()),
                 request.manufacturerId(),
                 request.manufacturingDate(),
-                request.expiryDate()
+                request.expiryDate(),
+                request.batchUnitCount()
         );
 
         FireflyAckDto serviceResponse = registryService.registerBatch(safeRequest);
@@ -80,9 +86,9 @@ public class BatchController {
      * - use qr_hash to fetch the provenance trail
      */
     @GetMapping("/{batchNumber}/history")
-    public ResponseEntity<FullProvenanceDto> getBatchHistory(@PathVariable String batchNumber) {
+    public ResponseEntity<ProvenanceResponseDto> getBatchHistory(@PathVariable String batchNumber) {
         PharmaceuticalRegistry batch = registryService.getBatchDetails(sanitizeStrict(batchNumber));
-        FullProvenanceDto history = provenanceService.getProvenance(batch.getQrHash());
+        ProvenanceResponseDto history = provenanceService.getProvenance(batch.getQrHash());
         return ResponseEntity.ok(history);
     }
 
@@ -123,9 +129,9 @@ public class BatchController {
      * Still not implemented because RegistryService currently does not expose getAllBatches().
      */
     @GetMapping
-    public ResponseEntity<?> listBatches() {
-        return ResponseEntity.status(HttpStatus.NOT_IMPLEMENTED)
-                .body("TODO: Implement registryService.getAllBatches() mapping.");
+    public ResponseEntity<List<PharmaceuticalRegistry>> listBatches() {
+        // Fetches all batches from the service layer
+        return ResponseEntity.ok(registryService.getAllBatches());
     }
 
     /**
@@ -138,6 +144,17 @@ public class BatchController {
     public ResponseEntity<?> initiateRecall(@PathVariable String batchNumber) {
         return ResponseEntity.status(HttpStatus.NOT_IMPLEMENTED)
                 .body("TODO: Implement regulatoryService.initiateRecall(batchNumber).");
+    }
+
+    @GetMapping("/hash/{qrHash}")
+    public ResponseEntity<?> getBatchByHash(@PathVariable String qrHash) {
+        Optional<PharmaceuticalRegistry> registryOpt = registryRepository.findByQrHash(qrHash);
+
+        if (registryOpt.isEmpty()) {
+            return ResponseEntity.notFound().build();
+        }
+
+        return ResponseEntity.ok(registryOpt.get());
     }
 
     /**

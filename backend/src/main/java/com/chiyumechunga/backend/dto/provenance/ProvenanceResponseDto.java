@@ -1,4 +1,11 @@
 package com.chiyumechunga.backend.dto.provenance;
 
-public class ProvenanceResponseDto {
-}
+import java.time.LocalDateTime;
+import java.util.List;
+
+public record ProvenanceResponseDto(
+        String verificationStatus, // e.g., "AUTHENTIC"
+        LocalDateTime scanTimestamp,
+        ProductDetailsDto productDetails,
+        List<ProvenanceEventDto> provenanceTimeline
+) {}

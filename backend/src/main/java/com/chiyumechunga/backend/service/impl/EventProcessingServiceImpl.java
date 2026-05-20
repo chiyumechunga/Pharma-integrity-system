@@ -7,10 +7,15 @@ import com.chiyumechunga.backend.repository.*;
 import com.chiyumechunga.backend.service.EventProcessingService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.nio.charset.StandardCharsets;
+import java.security.MessageDigest;
 import java.time.ZonedDateTime;
+import java.util.ArrayList;
+import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 
@@ -19,6 +24,7 @@ import java.util.UUID;
 @RequiredArgsConstructor
 public class EventProcessingServiceImpl implements EventProcessingService {
 
+    private final SerializedUnitRepository unitRepo;
     private final PharmaceuticalRegistryRepository registryRepo;
     private final SupplyChainParticipantRepository participantRepo;
     private final ChainOfCustodyRepository custodyRepo;
@@ -39,7 +45,6 @@ public class EventProcessingServiceImpl implements EventProcessingService {
         UUID eventId = event.id();
         log.info("Processing Firefly Event ID: {}", eventId);
 
-        // FIX: Check inside the blockchainEvent object
         if (event.blockchainEvent() == null || event.blockchainEvent().output() == null) {
             log.warn("Received empty event payload. Ignoring.");
             return;
@@ -53,8 +58,6 @@ public class EventProcessingServiceImpl implements EventProcessingService {
 
         try {
             String eventName = event.blockchainEvent().name();
-
-            // FIX: Extract data from inside the blockchainEvent object
             var data = event.blockchainEvent().output();
 
             switch (eventName) {
@@ -63,6 +66,9 @@ public class EventProcessingServiceImpl implements EventProcessingService {
                     break;
                 case "CustodyTransferred":
                     handleCustodyTransferred(eventId, data, event);
+                    break;
+                case "TestResultsSubmitted":
+                    handleTestResultsSubmitted(eventId, data, event);
                     break;
                 default:
                     log.warn("Unknown blockchain event name: {}. Ignoring payload.", eventName);
@@ -88,6 +94,7 @@ public class EventProcessingServiceImpl implements EventProcessingService {
         String finalStatus = mapBlockchainStatus(data.currentStatus());
 
         Optional<PharmaceuticalRegistry> existingRecordOpt = registryRepo.findByQrHash(qrHash);
+        PharmaceuticalRegistry savedBatch;
 
         if (existingRecordOpt.isPresent()) {
             PharmaceuticalRegistry existing = existingRecordOpt.get();
@@ -102,8 +109,11 @@ public class EventProcessingServiceImpl implements EventProcessingService {
                     existing.setBlockchainTxId(event.transaction().id());
                 }
                 existing.setFireflyId(eventId);
-                registryRepo.save(existing);
+                savedBatch = registryRepo.save(existing);
                 log.info("Successfully confirmed Batch {} on the blockchain.", data.batchNumber());
+
+                // Trigger auto-population immediately
+                populateMissingUnitsForBatch(savedBatch);
             }
         } else {
             UUID manufacturerUuid = data.manufacturerId();
@@ -118,55 +128,103 @@ public class EventProcessingServiceImpl implements EventProcessingService {
             entity.setExpiryDate(data.expiryDate());
             entity.setFireflyId(eventId);
 
+            // Set default batch limit to prevent nulls
+            entity.setBatchUnitCount(20);
+
             if (event.transaction() != null) {
                 entity.setBlockchainTxId(event.transaction().id());
             }
 
             entity.setCurrentStatus(finalStatus);
             entity.setConfirmedAt(ZonedDateTime.now().toLocalDateTime());
-            registryRepo.save(entity);
+
+            savedBatch = registryRepo.save(entity);
             log.info("Successfully synchronized external Batch {} to local database.", data.batchNumber());
+
+            // Trigger auto-population immediately
+            populateMissingUnitsForBatch(savedBatch);
         }
     }
 
     private void handleCustodyTransferred(UUID eventId, AssetData data, FireflyEventDto event) {
         String qrHash = data.qrHash();
 
-        PharmaceuticalRegistry registry = registryRepo.findByQrHash(qrHash)
-                .orElseThrow(() -> new RuntimeException("Cannot transfer custody. Asset not found for QR: " + qrHash));
-
         SupplyChainParticipant fromParticipant = participantRepo.findById(data.fromParticipantId())
                 .orElseThrow(() -> new RuntimeException("Sender not found: " + data.fromParticipantId()));
 
-        SupplyChainParticipant toParticipant = participantRepo.findById(data.toParticipantId())
-                .orElseThrow(() -> new RuntimeException("Receiver not found: " + data.toParticipantId()));
+        SupplyChainParticipant toParticipant = null;
+        if (data.toParticipantId() != null) {
+            toParticipant = participantRepo.findById(data.toParticipantId()).orElse(null);
+        }
 
         ChainOfCustodyEvent custodyEvent = new ChainOfCustodyEvent();
-
-        // This will now work because we fixed the model class below!
-        custodyEvent.setRegistry(registry);
-
         custodyEvent.setFromParticipant(fromParticipant);
         custodyEvent.setToParticipant(toParticipant);
         custodyEvent.setEventType(data.eventType());
         custodyEvent.setQuantity(data.quantity());
+        custodyEvent.setBlockchainTxId(event.transaction() != null ? event.transaction().id() : data.txId());
 
-        if (event.transaction() != null) {
-            custodyEvent.setBlockchainTxId(event.transaction().id());
+        Optional<SerializedUnit> unitOpt = unitRepo.findByQrHash(qrHash);
+
+        if (unitOpt.isPresent()) {
+            SerializedUnit unit = unitOpt.get();
+            PharmaceuticalRegistry parentBatch = registryRepo.findById(unit.getRegistryId())
+                    .orElseThrow(() -> new RuntimeException("Parent batch not found for unit"));
+
+            custodyEvent.setRegistry(parentBatch);
+            custodyEvent.setUnit(unit);
+
+            unit.setCurrentStatus(data.eventType());
+            unitRepo.save(unit);
+
+            log.info("Recorded item-level transfer {} for Serial {}.", data.eventType(), unit.getSerialNumber());
+
         } else {
-            custodyEvent.setBlockchainTxId(data.txId());
+            PharmaceuticalRegistry registry = registryRepo.findByQrHash(qrHash)
+                    .orElseThrow(() -> new RuntimeException("Asset not found for QR: " + qrHash));
+
+            custodyEvent.setRegistry(registry);
+            custodyEvent.setUnit(null);
+
+            if ("DISPENSED".equals(data.eventType()) || "DESTROYED".equals(data.eventType())) {
+                registry.setCurrentStatus(data.eventType());
+                registryRepo.save(registry);
+            }
+
+            log.info("Recorded batch-level transfer {} for Batch {}.", data.eventType(), registry.getBatchNumber());
         }
 
         custodyRepo.save(custodyEvent);
+    }
 
-        if ("DISPENSED".equals(data.eventType()) || "DESTROYED".equals(data.eventType())) {
-            registry.setCurrentStatus(data.eventType());
-            registryRepo.save(registry);
+    private void handleTestResultsSubmitted(UUID eventId, AssetData data, FireflyEventDto event) {
+        String qrHash = data.qrHash();
+
+        PharmaceuticalRegistry registry = registryRepo.findByQrHash(qrHash)
+                .orElseThrow(() -> new RuntimeException("Cannot log test results. Asset not found for QR: " + qrHash));
+
+        RegulatoryScrutiny scrutiny = new RegulatoryScrutiny();
+        scrutiny.setRegistry(registry);
+        scrutiny.setScrutinyDate(java.time.LocalDate.now());
+
+        try {
+            scrutiny.setTestResult(com.chiyumechunga.backend.model.TestResult.valueOf(data.currentStatus()));
+        } catch (IllegalArgumentException e) {
+            log.warn("Could not map blockchain status '{}' to TestResult Enum.", data.currentStatus());
         }
 
-        // Syntax error cleanly fixed here
-        log.info("Successfully recorded custody transfer {} for QR {}. Sender: {}, Receiver: {}",
-                data.eventType(), qrHash, fromParticipant.getParticipantCode(), toParticipant.getParticipantCode());
+        if (event.transaction() != null) {
+            scrutiny.setBlockchainTxId(event.transaction().id());
+        } else {
+            scrutiny.setBlockchainTxId(data.txId() != null ? data.txId() : "UNKNOWN_TX");
+        }
+
+        scrutinyRepo.save(scrutiny);
+
+        registry.setCurrentStatus(data.currentStatus());
+        registryRepo.save(registry);
+
+        log.info("Successfully recorded Regulatory Scrutiny for QR {}. Status: {}", qrHash, data.currentStatus());
     }
 
     private void saveCheckpoint(String eventId, String sequence) {
@@ -176,42 +234,76 @@ public class EventProcessingServiceImpl implements EventProcessingService {
         checkpointRepo.save(checkpoint);
     }
 
-    // --- TEST RESULTS LOGIC (USING REGULATORY SCRUTINY) ---
-    private void handleTestResultsSubmitted(UUID eventId, AssetData data, FireflyEventDto event) {
-        String qrHash = data.qrHash();
+    // =========================================================================================
+    // SYSTEM AUTOMATION: Auto-Populate Serialized Units (Primary Packaging)
+    // =========================================================================================
 
-        PharmaceuticalRegistry registry = registryRepo.findByQrHash(qrHash)
-                .orElseThrow(() -> new RuntimeException("Cannot log test results. Asset not found for QR: " + qrHash));
+    /**
+     * Background Job: Runs every 5 minutes to find old/existing batches in the database
+     * that do not have their primary serialized units generated yet.
+     */
+    @Scheduled(fixedDelay = 300000)
+    @Transactional
+    public void backgroundSweepForMissingUnits() {
+        log.debug("Running background sweep for batches missing serialized units...");
 
-        // 1. Use your existing RegulatoryScrutiny model
-        RegulatoryScrutiny scrutiny = new RegulatoryScrutiny();
-        scrutiny.setRegistry(registry);
-        scrutiny.setScrutinyDate(java.time.LocalDate.now());
+        List<PharmaceuticalRegistry> allBatches = registryRepo.findAll();
+        for (PharmaceuticalRegistry batch : allBatches) {
+            populateMissingUnitsForBatch(batch);
+        }
+    }
 
-        // Assuming data.currentStatus() string matches your TestResult Enum (e.g., "PASSED", "FAILED")
+    /**
+     * Core logic to generate child units for a parent batch.
+     */
+    private void populateMissingUnitsForBatch(PharmaceuticalRegistry batch) {
+        List<SerializedUnit> existingUnits = unitRepo.findByRegistryId(batch.getRegistryId());
+
+        // If the batch has no units, and its configuration requires units
+        if (existingUnits.isEmpty() && batch.getBatchUnitCount() > 0) {
+            log.info("SYSTEM AUTO-GEN: Creating {} serialized units for Batch {}", batch.getBatchUnitCount(), batch.getBatchNumber());
+
+            List<SerializedUnit> newUnits = new ArrayList<>();
+
+            for (int i = 1; i <= batch.getBatchUnitCount(); i++) {
+                SerializedUnit unit = new SerializedUnit();
+                unit.setRegistryId(batch.getRegistryId());
+
+                // Generates format: BATCH-ARTN-2026-002-SN001
+                String serialNumber = String.format("%s-SN%03d", batch.getBatchNumber(), i);
+                unit.setSerialNumber(serialNumber);
+                unit.setCurrentStatus("IN_BATCH");
+
+                // Give each item a real, cryptographically secure hash
+                unit.setQrHash(generateSHA256Hash(serialNumber));
+
+                newUnits.add(unit);
+            }
+
+            unitRepo.saveAll(newUnits);
+            log.info("Successfully populated all missing serialized units for Batch: {}", batch.getBatchNumber());
+        }
+    }
+
+    /**
+     * Helper method to generate realistic 64-character SHA-256 hashes for unit QR codes
+     */
+    private String generateSHA256Hash(String input) {
         try {
-            scrutiny.setTestResult(com.chiyumechunga.backend.model.TestResult.valueOf(data.currentStatus()));
-        } catch (IllegalArgumentException e) {
-            log.warn("Could not map blockchain status '{}' to TestResult Enum.", data.currentStatus());
+            MessageDigest digest = MessageDigest.getInstance("SHA-256");
+            byte[] hashBytes = digest.digest(input.getBytes(StandardCharsets.UTF_8));
+            StringBuilder hexString = new StringBuilder(2 * hashBytes.length);
+            for (byte b : hashBytes) {
+                String hex = Integer.toHexString(0xff & b);
+                if (hex.length() == 1) {
+                    hexString.append('0');
+                }
+                hexString.append(hex);
+            }
+            return hexString.toString();
+        } catch (Exception e) {
+            log.error("Failed to generate secure QR hash. Falling back to UUID.", e);
+            return UUID.randomUUID().toString().replace("-", "");
         }
-
-        // Handle the transaction ID
-        if (event.transaction() != null) {
-            scrutiny.setBlockchainTxId(event.transaction().id());
-        } else {
-            scrutiny.setBlockchainTxId(data.txId() != null ? data.txId() : "UNKNOWN_TX");
-        }
-
-        // Note: inspectorId and labNotes might not be in the FireFly blockchain event payload.
-        // If they aren't, they will safely remain null, or you can fetch them if you update AssetData later!
-
-        scrutinyRepo.save(scrutiny);
-
-        // 2. Update the main Registry table so the whole system knows the batch passed/failed
-        registry.setCurrentStatus(data.currentStatus());
-        //registry.setApprovedByZamra("PASSED".equalsIgnoreCase(data.currentStatus()));
-        registryRepo.save(registry);
-
-        log.info("Successfully recorded Regulatory Scrutiny for QR {}. Status: {}", qrHash, data.currentStatus());
     }
 }

@@ -1,4 +1,4 @@
-/* src/features/pharmacy/PharmacyDashboard.module.css */
+/* src/features/pharmacy/ZammsaDashboard.module.css */
 
 /* ── 1. Dashboard Shell & Layout ── */
 .dashboardWrapper {
@@ -298,4 +298,30 @@
     .mainContent { padding: 24px 16px; }
     .title { font-size: 24px; }
     .actionCard, .scannerZone { padding: 24px 16px; }
+}
+
+/* Action Buttons within Table */
+.btnAction {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 8px 16px;
+    border-radius: 8px; /* Maps to var(--radius-lg) */
+    font-family: var(--font-ui, sans-serif);
+    font-weight: 600;
+    font-size: 13px;
+    cursor: pointer;
+    background-color: var(--primary-light, #e3f2fd);
+    color: var(--primary-container, #1976d2);
+    border: 1px solid transparent;
+    transition: all 0.2s ease;
+}
+
+.btnAction:hover {
+    background-color: var(--primary-container, #1976d2);
+    color: white;
+}
+
+.btnAction:active {
+    transform: scale(0.96);
 }

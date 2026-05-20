@@ -1,4 +1,3 @@
 package com.chiyumechunga.backend.dto.auth;
 
-public class ForgotPasswordRequestDto {
-}
+public record ForgotPasswordRequestDto(String email) {}

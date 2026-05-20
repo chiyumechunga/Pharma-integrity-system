@@ -1,6 +1,7 @@
 package com.chiyumechunga.backend.controller;
 
 import com.chiyumechunga.backend.dto.ProductRequestDto;
+import com.chiyumechunga.backend.dto.ProductResponseDto;
 import com.chiyumechunga.backend.model.ProductMaster;
 import com.chiyumechunga.backend.service.ProductMasterService;
 import jakarta.validation.Valid;
@@ -56,5 +57,10 @@ public class ProductMasterController {
     @GetMapping("/{id}")
     public ResponseEntity<ProductMaster> getProductById(@PathVariable UUID id) {
         return ResponseEntity.ok(productMasterService.getProductById(id));
+    }
+
+    @GetMapping("/pending")
+    public ResponseEntity<List<ProductResponseDto>> getPendingApprovals() {
+        return ResponseEntity.ok(productMasterService.getPendingProducts());
     }
 }

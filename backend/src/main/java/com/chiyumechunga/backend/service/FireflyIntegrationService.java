@@ -11,4 +11,12 @@ public interface FireflyIntegrationService {
      * @return The Operation ID from Firefly
      */
     String invokeContract(String functionName, Object payload, ParticipantType role);
+
+    /**
+     * Retrieves the status of an asynchronous FireFly operation.
+     * @param operationId The ID of the operation to check
+     * @return The operation status payload
+     */
+    Object getOperationStatus(String operationId);
+    String queryContract(String functionName, Object payload, ParticipantType role);
 }

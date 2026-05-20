@@ -1,11 +1,23 @@
 <!doctype html>
 <html lang="en">
-  <head>
-    <meta charset="UTF-8" />
-    <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>pis</title>
-  </head>
+<head>
+  <meta charset="UTF-8" />
+  <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+
+  <!-- PWA core -->
+  <meta name="theme-color" content="#01696f" />
+  <meta name="description" content="Blockchain-based Pharmaceutical supply chain tracker and Anti-Counterfeiting tool" />
+  <link rel="manifest" href="/manifest.webmanifest" />
+
+  <!-- iOS-specific (Safari doesn't use the manifest for install) -->
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+  <meta name="apple-mobile-web-app-title" content="PIS" />
+  <link rel="apple-touch-icon" href="/icons/apple-touch-icon.png" />
+
+  <title>Pharmaceutical Integrity System</title>
+</head>
   <body>
     <div id="root"></div>
     <script type="module" src="/src/main.jsx"></script>

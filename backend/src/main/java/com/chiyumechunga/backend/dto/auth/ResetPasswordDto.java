@@ -1,4 +1,3 @@
 package com.chiyumechunga.backend.dto.auth;
 
-public class ResetPasswordDto {
-}
+public record ResetPasswordDto(String token, String newPassword) {}

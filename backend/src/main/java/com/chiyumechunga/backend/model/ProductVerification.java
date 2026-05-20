@@ -1,5 +1,6 @@
 package com.chiyumechunga.backend.model;
 
+import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import jakarta.persistence.*;
 import lombok.Data;
 import lombok.NoArgsConstructor;
@@ -20,7 +21,14 @@ public class ProductVerification {
 
     @ManyToOne
     @JoinColumn(name = "registry_id")
+    @JsonIgnoreProperties({"hibernateLazyInitializer", "handler"})
     private PharmaceuticalRegistry pharmaceuticalRegistry;
+
+    // Maps the unit_id from the database to the SerializedUnit entity
+    @ManyToOne
+    @JoinColumn(name = "unit_id")
+    @JsonIgnoreProperties({"hibernateLazyInitializer", "handler"})
+    private SerializedUnit serializedUnit;
 
     @Column(name = "device_fingerprint")
     private String deviceFingerprint;

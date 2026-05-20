@@ -5,7 +5,9 @@ import lombok.Data;
 import lombok.NoArgsConstructor;
 import org.hibernate.annotations.CreationTimestamp;
 import java.time.LocalDateTime;
+import java.util.List;
 import java.util.UUID;
+import com.fasterxml.jackson.annotation.JsonIgnore;
 
 @Entity
 @Table(name = "product_master")
@@ -39,10 +41,17 @@ public class ProductMaster {
     @Column(name = "requires_cold_chain")
     private boolean requiresColdChain;
 
+    @Column(name = "max_units_per_batch", nullable = false)
+    private Integer maxUnitsPerBatch = 20; // Default to 20 based on your DB schema
+
     @Column(name = "approved_by_zamra")
     private boolean approvedByZamra;
 
     @CreationTimestamp
     @Column(name = "created_at", updatable = false)
     private LocalDateTime createdAt;
+
+    @JsonIgnore //  Prevents the infinite loop when fetching batches
+    @OneToMany(mappedBy = "product")
+    private List<PharmaceuticalRegistry> batches;
 }

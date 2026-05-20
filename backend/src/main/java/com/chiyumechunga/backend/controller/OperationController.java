@@ -23,10 +23,8 @@ public class OperationController {
     // 1. CHECK ASYNC OPERATION STATUS
     @GetMapping("/{operationId}")
     public ResponseEntity<?> getOperationStatus(@PathVariable String operationId) {
-        // Assumption Flag: fireflyIntegrationService needs a getOperationStatus() method
-        // that queries the Firefly API: GET /api/v1/namespaces/default/operations/{id}
-
-        return ResponseEntity.status(HttpStatus.NOT_IMPLEMENTED)
-                .body("TODO: Implement fireflyIntegrationService.getOperationStatus(operationId).");
+        log.info("Fetching operation status for ID: {}", operationId);
+        Object status = fireflyIntegrationService.getOperationStatus(operationId);
+        return ResponseEntity.ok(status);
     }
 }
