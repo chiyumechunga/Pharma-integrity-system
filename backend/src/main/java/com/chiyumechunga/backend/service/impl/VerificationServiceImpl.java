@@ -112,7 +112,7 @@ public class VerificationServiceImpl implements VerificationService {
 
         // 5. DELEGATE TO AUDIT MODULE
         String auditStatus = isValid ? "AUTHENTIC" : (isRecalled ? "RECALLED" : "SUSPICIOUS");
-        auditService.logScanAsync(product, scannedUnit, deviceFingerprint, geo, auditStatus, scannedByRole);
+        auditService.logScanAsync(product, scannedUnit, deviceFingerprint, geo, auditStatus,scannedByRole);
 
         // 6. BUILD RESPONSE
         String responseMessage;

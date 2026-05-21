@@ -1,10 +1,15 @@
 package com.chiyumechunga.backend.service;
 
 import com.chiyumechunga.backend.dto.FireflyAckDto;
+import com.chiyumechunga.backend.dto.LabInspectionRequestDto;
+import com.chiyumechunga.backend.dto.RecallRequestDto;
 import com.chiyumechunga.backend.dto.RegistryRequestDto;
 import com.chiyumechunga.backend.model.PharmaceuticalRegistry; // <--- MISSING IMPORT
+import com.chiyumechunga.backend.model.ProductRecall;
+import com.chiyumechunga.backend.model.RegulatoryScrutiny;
 
 import java.util.List;
+import java.util.UUID;
 
 public interface RegistryService {
     // Defines the contract for creating a batch
@@ -14,4 +19,6 @@ public interface RegistryService {
     PharmaceuticalRegistry getBatchDetails(String batchNumber);
 
     List<PharmaceuticalRegistry> getAllBatches();
+
+
 }

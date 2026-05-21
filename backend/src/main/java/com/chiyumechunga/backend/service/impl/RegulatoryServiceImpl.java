@@ -2,12 +2,15 @@ package com.chiyumechunga.backend.service.impl;
 
 import com.chiyumechunga.backend.dto.FireflyAckDto;
 import com.chiyumechunga.backend.dto.LabInspectionRequestDto;
+import com.chiyumechunga.backend.dto.RecallRequestDto;
 import com.chiyumechunga.backend.exception.ResourceNotFoundException;
 import com.chiyumechunga.backend.model.ParticipantType;
 import com.chiyumechunga.backend.model.PharmaceuticalRegistry;
+import com.chiyumechunga.backend.model.ProductRecall;
 import com.chiyumechunga.backend.model.RegulatoryScrutiny;
 import com.chiyumechunga.backend.model.SupplyChainParticipant;
 import com.chiyumechunga.backend.repository.PharmaceuticalRegistryRepository;
+import com.chiyumechunga.backend.repository.ProductRecallRepository;
 import com.chiyumechunga.backend.repository.RegulatoryScrutinyRepository;
 import com.chiyumechunga.backend.repository.SupplyChainParticipantRepository;
 import com.chiyumechunga.backend.service.FireflyIntegrationService;
@@ -15,8 +18,11 @@ import com.chiyumechunga.backend.service.RegulatoryService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDate;
+import java.util.List;
+import java.util.UUID;
 
 @Slf4j
 @Service
@@ -27,8 +33,10 @@ public class RegulatoryServiceImpl implements RegulatoryService {
     private final SupplyChainParticipantRepository participantRepository;
     private final RegulatoryScrutinyRepository scrutinyRepository;
     private final PharmaceuticalRegistryRepository registryRepository;
+    private final ProductRecallRepository recallRepository;
 
     @Override
+    @Transactional
     public FireflyAckDto recordLabInspection(LabInspectionRequestDto request) {
         log.info("Verifying Inspector Identity for Registry ID: {}", request.registryId());
 
@@ -69,5 +77,52 @@ public class RegulatoryServiceImpl implements RegulatoryService {
         );
     }
 
-    // REMOVED: The duplicate/dummy 'submitInspection' method was deleted here.
+    @Override
+    @Transactional(readOnly = true)
+    public RegulatoryScrutiny getInspectionById(UUID id) {
+        return scrutinyRepository.findById(id)
+                .orElseThrow(() -> new ResourceNotFoundException("Scrutiny record not found."));
+    }
+
+    @Override
+    @Transactional
+    public void executeRecall(RecallRequestDto request) {
+        log.info("Executing market recall for batch: {}", request.batchNumber());
+
+        // 1. Fetch the target batch
+        PharmaceuticalRegistry batch = registryRepository.findByBatchNumber(request.batchNumber())
+                .orElseThrow(() -> new ResourceNotFoundException("Batch not found: " + request.batchNumber()));
+
+        // 2. Validate the initiator's authority
+        SupplyChainParticipant initiator = participantRepository.findById(request.initiatedBy())
+                .orElseThrow(() -> new ResourceNotFoundException("Initiator not found."));
+
+        if (initiator.getRole() != ParticipantType.ZAMRA) {
+            log.warn("SECURITY ALERT: Unauthorized recall attempt by: {}", initiator.getParticipantId());
+            throw new RuntimeException("Unauthorized: Only ZAMRA can initiate recalls.");
+        }
+
+        // 3. Create the official recall record using Object relationships
+        ProductRecall recall = new ProductRecall();
+        recall.setRegistry(batch);               // Maps to registry_id
+        recall.setProduct(batch.getProduct());   // Maps to product_id
+        recall.setRecallReason(request.recallReason());
+        recall.setSeverityLevel(request.severityLevel());
+        recall.setInitiatedBy(initiator);        // Maps to initiated_by
+        recall.setStatus("ACTIVE");
+
+        recallRepository.save(recall);
+
+        // 4. Update the Batch Status globally
+        batch.setCurrentStatus("RECALLED");
+        registryRepository.save(batch);
+
+        log.info("Batch {} status updated to RECALLED.", batch.getBatchNumber());
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public List<ProductRecall> getAllRecalls() {
+        return recallRepository.findAll();
+    }
 }

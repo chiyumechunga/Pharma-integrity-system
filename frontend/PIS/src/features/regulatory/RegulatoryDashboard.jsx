@@ -115,7 +115,8 @@ export default function RegulatoryDashboard() {
     });
 
     const recallMutation = useMutation({
-        mutationFn: async (data) => (await apiClient.post(`/operations/recall`, data)).data,
+
+        mutationFn: async (data) => (await apiClient.post('/regulatory/recalls', data)).data,
         onSuccess: () => {
             alert(`Recall successfully initiated for ${recallForm.batchNumber}`);
             setRecallForm({ batchNumber: '', severityLevel: 'CLASS_II', reason: '' });

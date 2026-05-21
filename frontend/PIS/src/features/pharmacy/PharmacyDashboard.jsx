@@ -60,7 +60,7 @@ export default function PharmacyDashboard() {
         ...dispensedUnits.map(unit => ({
             eventType: 'DISPENSED',
             identifier: unit.serialNumber,
-            productName: 'Individual Unit Dispense',
+            productName: 'product.genericName',
             status: 'Ledger Verified'
         }))
     ];

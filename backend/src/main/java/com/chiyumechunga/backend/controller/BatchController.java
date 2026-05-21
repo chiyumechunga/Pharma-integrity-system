@@ -134,17 +134,7 @@ public class BatchController {
         return ResponseEntity.ok(registryService.getAllBatches());
     }
 
-    /**
-     * 6. INITIATE RECALL
-     *
-     * Still not implemented because recall orchestration belongs to a separate service,
-     * not RegistryService.
-     */
-    @PostMapping("/{batchNumber}/recall")
-    public ResponseEntity<?> initiateRecall(@PathVariable String batchNumber) {
-        return ResponseEntity.status(HttpStatus.NOT_IMPLEMENTED)
-                .body("TODO: Implement regulatoryService.initiateRecall(batchNumber).");
-    }
+
 
     @GetMapping("/hash/{qrHash}")
     public ResponseEntity<?> getBatchByHash(@PathVariable String qrHash) {
