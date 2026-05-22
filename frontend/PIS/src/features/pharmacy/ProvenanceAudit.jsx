@@ -9,7 +9,6 @@ export default function ProvenanceAudit() {
     const { qrHash: routeHash } = useParams();
     const navigate = useNavigate();
 
-    // Initialize state with URL param if available, otherwise null to trigger scanner
     const [scannedHash, setScannedHash] = useState(routeHash || null);
 
     const { data: history, isLoading, error } = useQuery({
@@ -17,6 +16,11 @@ export default function ProvenanceAudit() {
         queryFn: async () => {
             const response = await apiClient.get(`/provenance/${scannedHash}`);
             let responseData = response.data?.data || response.data;
+
+            // Extract timeline from the root DTO
+            if (responseData && responseData.provenanceTimeline) {
+                responseData = responseData.provenanceTimeline;
+            }
 
             if (!Array.isArray(responseData)) {
                 if (responseData && typeof responseData === 'object') {
@@ -26,17 +30,15 @@ export default function ProvenanceAudit() {
                 }
             }
 
-            // Parse Firefly stringified payloads if necessary
             if (responseData.length > 0 && typeof responseData[0] === 'string') {
                 responseData = responseData.map(item => JSON.parse(item));
             }
 
             return responseData;
         },
-        enabled: !!scannedHash // Only run the query if we have a hash
+        enabled: !!scannedHash
     });
 
-    // Handle Scanner Initialization
     useEffect(() => {
         let scanner;
         if (!scannedHash) {
@@ -54,15 +56,12 @@ export default function ProvenanceAudit() {
                     }
 
                     scanner.clear().then(() => {
-
-                        // THE FIX: Wrap the suspending state update in startTransition
                         startTransition(() => {
                             setScannedHash(decodedText);
                         });
-
                     }).catch(console.error);
                 },
-                () => {} // Ignore background read errors
+                () => {}
             );
         }
 
@@ -76,7 +75,6 @@ export default function ProvenanceAudit() {
     const handleReset = () => {
         setScannedHash(null);
         if (routeHash) {
-            // Clean up the URL if we started with a direct link
             navigate('/audit', { replace: true });
         }
     };
@@ -86,21 +84,12 @@ export default function ProvenanceAudit() {
             <main className={styles.mainContent} style={{ maxWidth: '900px' }}>
                 <header className={styles.header}>
                     <div>
-                        {/* Dynamic Back Button */}
                         <button
                             onClick={() => navigate(-1)}
                             style={{
-                                display: 'inline-flex',
-                                alignItems: 'center',
-                                gap: '8px',
-                                background: 'none',
-                                border: 'none',
-                                color: 'var(--on-surface-variant)',
-                                cursor: 'pointer',
-                                fontWeight: '600',
-                                fontFamily: 'var(--font-ui)',
-                                padding: 0,
-                                marginBottom: '16px',
+                                display: 'inline-flex', alignItems: 'center', gap: '8px', background: 'none',
+                                border: 'none', color: 'var(--on-surface-variant)', cursor: 'pointer',
+                                fontWeight: '600', fontFamily: 'var(--font-ui)', padding: 0, marginBottom: '16px',
                                 transition: 'color 0.2s'
                             }}
                             onMouseEnter={(e) => e.currentTarget.style.color = 'var(--primary)'}
@@ -115,7 +104,6 @@ export default function ProvenanceAudit() {
                 </header>
 
                 <div className={styles.scannerZone}>
-                    {/* STATE 1: Waiting for Scan */}
                     {!scannedHash ? (
                         <div style={{ textAlign: 'center', padding: '24px 0' }}>
                             <h2 style={{ marginBottom: '16px', color: '#333' }}>Scan Item to View Provenance</h2>
@@ -125,7 +113,6 @@ export default function ProvenanceAudit() {
                             </div>
                         </div>
                     ) : (
-                        /* STATE 2: Displaying Audit Data */
                         <>
                             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '32px', paddingBottom: '24px', borderBottom: '1px solid #eaeaea' }}>
                                 <div style={{ flex: 1, marginRight: '16px' }}>
@@ -165,13 +152,17 @@ export default function ProvenanceAudit() {
                             <div style={{ marginLeft: '16px' }}>
                                 {history?.map((event, index) => {
                                     const eventType = event.event_type || event.eventType || event.docType || 'EVENT_LOGGED';
-                                    const fromName = event.from_participant_name || event.fromParticipantId || event.manufacturerId || 'System';
-                                    const toName = event.to_participant_name || event.toParticipantId || event.currentOwnerId || 'Unknown Destination';
-                                    const txId = event.blockchain_tx || event.txId || event.blockchainTxId || 'Pending_Tx';
+
+                                    // CamelCase variable mapping
+                                    const fromName = event.fromParticipantName || event.fromParticipant || 'System';
+                                    const toName = event.toParticipantName || event.toParticipant || 'Unknown Destination';
+
+                                    // FIX: Explicitly check the snake_case JSON payload property
+                                    const txId = event.blockchainTxId || event.blockchain_tx_id || event.txId || 'Pending_Tx';
 
                                     let eventDate = 'Unknown Date';
-                                    if (event.event_timestamp || event.createdAt) {
-                                        eventDate = new Date(event.event_timestamp || event.createdAt).toLocaleString();
+                                    if (event.eventTimestamp || event.createdAt) {
+                                        eventDate = new Date(event.eventTimestamp || event.createdAt).toLocaleString();
                                     } else if (event.timestampNanos) {
                                         eventDate = new Date(parseInt(event.timestampNanos) / 1000000).toLocaleString();
                                     }
@@ -205,15 +196,6 @@ export default function ProvenanceAudit() {
                                                     <strong>To:</strong> {toName}
                                                 </p>
 
-                                                <div style={{ background: '#fff', padding: '8px', borderRadius: '4px', border: '1px solid #eee', display: 'inline-block' }}>
-                                                    <small style={{ display: 'flex', alignItems: 'center', gap: '4px', fontSize: '12px', color: '#666' }}>
-                                                        <span className="material-symbols-outlined" style={{ fontSize: '14px' }}>link</span>
-                                                        TX:
-                                                        <a href={`https://explorer.firefly.local/transactions/${txId}`} target="_blank" rel="noreferrer" style={{ color: 'var(--primary-container)', textDecoration: 'none', fontFamily: 'monospace' }}>
-                                                            {txId}
-                                                        </a>
-                                                    </small>
-                                                </div>
                                             </div>
                                         </div>
                                     );
@@ -230,6 +212,7 @@ export default function ProvenanceAudit() {
                         </>
                     )}
                 </div>
+
             </main>
         </div>
     );

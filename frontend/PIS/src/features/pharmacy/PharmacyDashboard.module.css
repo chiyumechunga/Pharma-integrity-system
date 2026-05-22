@@ -229,21 +229,15 @@
 .logoutBtn {
     background: transparent;
     border: none;
-    color: var(--on-surface-variant);
+    color: rgba(255,255,255,0.7);
     cursor: pointer;
     display: flex;
     align-items: center;
-    justify-content: center;
-    padding: 8px;
-    border-radius: 50%;
-    transition: all 0.2s ease;
-    margin-left: 12px;
+    justify-content: flex-start;
+    padding: 12px 16px;
+    border-radius: 8px;
 }
-
-.logoutBtn:hover {
-    background-color: rgba(214, 40, 40, 0.1);
-    color: #d62828;
-}
+.logoutBtn:hover { background-color: rgba(214, 40, 40, 0.8); color: white; }
 
 /* ── 7. Mobile Responsiveness ── */
 @media (max-width: 768px) {

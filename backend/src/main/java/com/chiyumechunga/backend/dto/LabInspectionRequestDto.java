@@ -1,6 +1,7 @@
 package com.chiyumechunga.backend.dto;
 
 import com.chiyumechunga.backend.model.TestResult;
+import com.chiyumechunga.backend.model.PharmaceuticalRegistry;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Size;

@@ -55,14 +55,24 @@ export default function PharmacyDashboard() {
     const dispensedUnits = units?.filter(u => u.currentStatus === 'DISPENSED') || [];
 
     // Combine Batch History and Individual Dispensed Units for the Ledger View
+    // Combine Batch History and Individual Dispensed Units for the Ledger View
     const combinedLedger = [
         ...(history || []),
-        ...dispensedUnits.map(unit => ({
-            eventType: 'DISPENSED',
-            identifier: unit.serialNumber,
-            productName: 'product.genericName',
-            status: 'Ledger Verified'
-        }))
+        ...dispensedUnits.map(unit => {
+            // Lookup parent batch to extract the exact product name from the registry
+            const parentBatch = batches?.find(b =>
+                (b.registryId && b.registryId === unit.registryId) ||
+                (b.registry_id && b.registry_id === unit.registry_id) ||
+                (unit.serialNumber || unit.serial_number)?.includes(b.batchNumber || b.batch_number)
+            );
+
+            return {
+                eventType: unit.currentStatus || unit.current_status,
+                identifier: unit.serialNumber || unit.serial_number,
+                productName: parentBatch ? (parentBatch.productName || parentBatch.product_name) : 'Pending Sync',
+                status: unit.currentStatus || unit.current_status
+            };
+        })
     ];
 
     const handlePrintLabels = (batch) => {
@@ -287,18 +297,20 @@ export default function PharmacyDashboard() {
                                             {record.eventType === 'DISPENSED' ? (
                                                 <span style={{ color: '#1e8e3e', display: 'flex', alignItems: 'center', gap: '4px' }}>
                                                     <span className="material-symbols-outlined" style={{ fontSize: '16px' }}>prescriptions</span>
-                                                    DISPENSED
+                                                    {record.eventType}
                                                 </span>
                                             ) : (
                                                 record.eventType || 'INBOUND RECEIPT'
                                             )}
                                         </td>
                                         <td style={{ padding: '16px', fontFamily: 'monospace' }}>{record.batchNumber || record.identifier || 'N/A'}</td>
-                                        <td style={{ padding: '16px' }}>{record.productName}</td>
+                                        <td style={{ padding: '16px' }}>{record.productName || 'N/A'}</td>
                                         <td style={{ padding: '16px' }}>
                                             <span style={{ color: record.eventType === 'DISPENSED' ? '#1e8e3e' : '#1976d2', fontWeight: '600', fontSize: '13px' }}>
-                                                <span className="material-symbols-outlined" style={{ fontSize: '14px', verticalAlign: 'middle', marginRight: '4px' }}>link</span>
-                                                Ledger Verified
+                                                <span className="material-symbols-outlined" style={{ fontSize: '14px', verticalAlign: 'middle', marginRight: '4px' }}>
+                                                    {record.status === 'DISPENSED' ? 'verified' : 'link'}
+                                                </span>
+                                                {record.status === 'DISPENSED' ? 'Ledger Verified' : (record.status || 'CONFIRMED')}
                                             </span>
                                         </td>
                                     </tr>

@@ -131,11 +131,23 @@ export default function RegulatoryDashboard() {
         }
     });
 
-    // ── Handlers ──
     const handleLabSubmit = (e) => {
         e.preventDefault();
+
+        // 1. Lookup the UUID for the entered Batch Number
+        const targetBatch = safeBatches.find(b =>
+            (b.batchNumber || b.batch_number) === labForm.batchNumber
+        );
+
+        // 2. Abort if the batch does not exist in the active registry
+        if (!targetBatch) {
+            alert("Validation Error: Batch Number not found in active registry. Please verify the batch ID.");
+            return;
+        }
+
+        // 3. Transmit the mapped registryId instead of the raw batchNumber
         labMutation.mutate({
-            batchNumber: labForm.batchNumber,
+            registryId: targetBatch.registryId || targetBatch.registry_id,
             testResult: labForm.status,
             labNotes: labForm.notes,
             inspectorId: user?.participantId

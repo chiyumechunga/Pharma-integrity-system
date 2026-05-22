@@ -54,26 +54,24 @@ public class RegulatoryServiceImpl implements RegulatoryService {
         PharmaceuticalRegistry registry = registryRepository.findById(request.registryId())
                 .orElseThrow(() -> new ResourceNotFoundException("Product registry ID not found."));
 
-        // 4. LOG LOCALLY
+        // 4. LOG LOCALLY (Backend Overhead Handling)
         RegulatoryScrutiny scrutiny = new RegulatoryScrutiny();
         scrutiny.setRegistry(registry);
         scrutiny.setInspector(inspector);
         scrutiny.setScrutinyDate(LocalDate.now());
         scrutiny.setTestResult(request.testResult());
         scrutiny.setLabNotes(request.labNotes());
-        scrutinyRepository.save(scrutiny);
 
-        // 5. INVOKE BLOCKCHAIN
-        String opId = fireflyService.invokeContract(
-                "SubmitTestResult",
-                request,
-                ParticipantType.ZAMRA
-        );
+        // Ensure the record is saved to PostgreSQL
+        RegulatoryScrutiny savedScrutiny = scrutinyRepository.save(scrutiny);
+
+        // 5. BYPASS BLOCKCHAIN INVOCATION
+        // Function SubmitTestResult is not deployed. Relying on PostgreSQL persistence.
 
         return new FireflyAckDto(
-                opId,
-                "SUBMITTED",
-                "Lab results verified and submitted to blockchain for consensus."
+                savedScrutiny.getScrutinyId().toString(), // Return local DB UUID instead of Firefly opId
+                "RECORDED_OFF_CHAIN",
+                "Lab results verified and securely recorded in the regulatory database."
         );
     }
 

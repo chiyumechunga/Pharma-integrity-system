@@ -19,6 +19,7 @@ import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.List;
 import java.util.Optional;
+import java.util.UUID;
 
 @Slf4j
 @Service
@@ -28,15 +29,18 @@ public class ProvenanceServiceImpl implements ProvenanceService {
     private final SerializedUnitRepository serializedUnitRepository;
     private final ChainOfCustodyRepository custodyRepository;
     private final ProductVerificationRepository verificationRepository;
+    private final SupplyChainParticipantRepository participantRepository;
 
     public ProvenanceServiceImpl(PharmaceuticalRegistryRepository registryRepository,
                                  SerializedUnitRepository serializedUnitRepository,
                                  ChainOfCustodyRepository custodyRepository,
-                                 ProductVerificationRepository verificationRepository) {
+                                 ProductVerificationRepository verificationRepository,
+                                 SupplyChainParticipantRepository participantRepository) {
         this.registryRepository = registryRepository;
         this.serializedUnitRepository = serializedUnitRepository;
         this.custodyRepository = custodyRepository;
         this.verificationRepository = verificationRepository;
+        this.participantRepository = participantRepository;
     }
 
     @Override
@@ -93,21 +97,15 @@ public class ProvenanceServiceImpl implements ProvenanceService {
                 systemStatus
         );
 
-        // =====================================================================
-        // OFF-CHAIN DATA FETCHING (Anchored Source of Truth)
-        // =====================================================================
         List<ProvenanceEventDto> finalTimeline = new ArrayList<>();
 
         if (isBatch) {
-            // Batch level just gets its own history
             finalTimeline.addAll(fetchOffChainTimeline(requestedQrHash));
         } else {
-            // Item level gets the parent batch's history + its own specific history
             finalTimeline.addAll(fetchOffChainTimeline(registry.getQrHash()));
             finalTimeline.addAll(fetchOffChainTimeline(requestedQrHash));
         }
 
-        // Deduplicate (in case of overlap) and Sort Chronologically (Newest First)
         List<ProvenanceEventDto> sortedTimeline = finalTimeline.stream()
                 .distinct()
                 .sorted(Comparator.comparing(ProvenanceEventDto::eventTimestamp).reversed())
@@ -116,21 +114,34 @@ public class ProvenanceServiceImpl implements ProvenanceService {
         return new ProvenanceResponseDto(status, scanTime, productDetails, sortedTimeline);
     }
 
-    /**
-     * Pulls the complete, anchored timeline directly from the PostgreSQL Chain of Custody tables/views.
-     * Since this is written to DB at the same time it is anchored on-chain, it holds the full truth.
-     */
     private List<ProvenanceEventDto> fetchOffChainTimeline(String qrHash) {
         return custodyRepository.getProductProvenance(qrHash)
                 .stream()
-                .map(row -> new ProvenanceEventDto(
-                        row.getEventTimestamp().toInstant().atZone(ZoneId.systemDefault()).toLocalDateTime(),
-                        row.getEventType(),
-                        row.getFromParticipantName(), // Passed as hash fallback
-                        row.getFromParticipantName(), // Actual Name
-                        row.getToParticipantName(),   // Passed as hash fallback
-                        row.getToParticipantName(),   // Actual Name
-                        row.getBlockchainTxId()
-                )).toList();
+                .map(row -> {
+                    // Resolve actual participant names from the database using the stored UUIDs
+                    String fromName = resolveParticipantName(row.getFromParticipantName());
+                    String toName = resolveParticipantName(row.getToParticipantName());
+
+                    return new ProvenanceEventDto(
+                            row.getEventTimestamp().toInstant().atZone(ZoneId.systemDefault()).toLocalDateTime(),
+                            row.getEventType(),
+                            row.getFromParticipantName(), // Passed as hash fallback
+                            fromName,                     // Actual Human Name
+                            row.getToParticipantName(),   // Passed as hash fallback
+                            toName,                       // Actual Human Name
+                            row.getBlockchainTxId()
+                    );
+                }).toList();
+    }
+
+    private String resolveParticipantName(String identifier) {
+        if (identifier == null || identifier.isBlank()) return "System";
+        try {
+            return participantRepository.findById(UUID.fromString(identifier))
+                    .map(p -> p.getParticipantName())
+                    .orElse("Unknown Entity");
+        } catch (IllegalArgumentException e) {
+            return identifier; // Return raw string if not a valid UUID
+        }
     }
 }
