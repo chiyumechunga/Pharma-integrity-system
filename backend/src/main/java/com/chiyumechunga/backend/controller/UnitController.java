@@ -3,6 +3,7 @@ package com.chiyumechunga.backend.controller;
 import com.chiyumechunga.backend.dto.DispenseRequest;
 import com.chiyumechunga.backend.model.SerializedUnit;
 import com.chiyumechunga.backend.repository.SerializedUnitRepository;
+import com.chiyumechunga.backend.service.QrCodeService;
 import com.google.zxing.BarcodeFormat;
 import com.google.zxing.client.j2se.MatrixToImageWriter;
 import com.google.zxing.common.BitMatrix;
@@ -24,9 +25,11 @@ import java.util.Optional;
 public class UnitController {
 
     private final SerializedUnitRepository serializedUnitRepository;
+    private final QrCodeService qrCodeService;
 
-    public UnitController(SerializedUnitRepository serializedUnitRepository) {
+    public UnitController(SerializedUnitRepository serializedUnitRepository, QrCodeService qrCodeService) {
         this.serializedUnitRepository = serializedUnitRepository;
+        this.qrCodeService = qrCodeService;
     }
 
     /**
@@ -55,33 +58,15 @@ public class UnitController {
     @GetMapping(value = "/{serialNumber}/qrcode", produces = MediaType.IMAGE_PNG_VALUE)
     public ResponseEntity<byte[]> getUnitQRCode(@PathVariable String serialNumber) {
         String safeSerialNumber = sanitizeStrict(serialNumber);
-        Optional<SerializedUnit> unitOpt = serializedUnitRepository.findBySerialNumber(safeSerialNumber);
 
-        if (unitOpt.isEmpty()) {
-            log.warn("QR code requested for unknown unit: {}", safeSerialNumber);
-            return ResponseEntity.notFound().build();
-        }
+        // Clean delegate
+        byte[] qrCode = qrCodeService.generateUnitQrCode(safeSerialNumber);
 
-        // Extract the 64-character hash from the database record
-        String qrDataToEncode = unitOpt.get().getQrHash();
+        HttpHeaders headers = new HttpHeaders();
+        headers.add("X-Content-Type-Options", "nosniff");
+        headers.setContentType(MediaType.IMAGE_PNG);
 
-        try {
-            QRCodeWriter qrCodeWriter = new QRCodeWriter();
-            // Encode the hash, not the serial number
-            BitMatrix bitMatrix = qrCodeWriter.encode(qrDataToEncode, BarcodeFormat.QR_CODE, 200, 200);
-
-            ByteArrayOutputStream pngOutputStream = new ByteArrayOutputStream();
-            MatrixToImageWriter.writeToStream(bitMatrix, "PNG", pngOutputStream);
-
-            HttpHeaders headers = new HttpHeaders();
-            headers.add("X-Content-Type-Options", "nosniff");
-            headers.setContentType(MediaType.IMAGE_PNG);
-
-            return new ResponseEntity<>(pngOutputStream.toByteArray(), headers, HttpStatus.OK);
-        } catch (Exception e) {
-            log.error("QR generation failed for serialNumber={}", safeSerialNumber, e);
-            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).build();
-        }
+        return new ResponseEntity<>(qrCode, headers, HttpStatus.OK);
     }
 
     /**

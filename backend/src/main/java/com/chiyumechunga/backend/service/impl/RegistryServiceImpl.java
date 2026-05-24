@@ -14,6 +14,7 @@ import com.chiyumechunga.backend.repository.ProductMasterRepository;
 import com.chiyumechunga.backend.repository.SerializedUnitRepository;
 import com.chiyumechunga.backend.repository.SupplyChainParticipantRepository;
 import com.chiyumechunga.backend.service.FireflyIntegrationService;
+import com.chiyumechunga.backend.service.QrCodeService;
 import com.chiyumechunga.backend.service.RegistryService;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.extern.slf4j.Slf4j;
@@ -39,18 +40,21 @@ public class RegistryServiceImpl implements RegistryService {
     private final SupplyChainParticipantRepository participantRepository;
     private final ProductMasterRepository productMasterRepository;
     private final SerializedUnitRepository serializedUnitRepository;
+    private final QrCodeService qrCodeService;
 
     public RegistryServiceImpl(FireflyIntegrationService fireflyService,
                                PharmaceuticalRegistryRepository registryRepository,
                                SupplyChainParticipantRepository participantRepository,
                                ProductMasterRepository productMasterRepository,
                                SerializedUnitRepository serializedUnitRepository,
+                               QrCodeService qrCodeService,
                                ObjectMapper objectMapper) {
         this.fireflyService = fireflyService;
         this.registryRepository = registryRepository;
         this.participantRepository = participantRepository;
         this.productMasterRepository = productMasterRepository;
         this.serializedUnitRepository = serializedUnitRepository;
+        this.qrCodeService = qrCodeService;
         this.objectMapper = objectMapper;
     }
 
@@ -89,7 +93,7 @@ public class RegistryServiceImpl implements RegistryService {
             throw new DuplicateResourceException("Batch number already exists: " + request.batchNumber());
         }
 
-        String qrHash = generateQrHash(request.batchNumber(), product.getProductId().toString(), manufacturer.getParticipantId().toString());
+        String qrHash = qrCodeService.generateBatchQrHash(request.batchNumber(), product.getProductId(), manufacturer.getParticipantId());
 
         PharmaceuticalRegistry registry = new PharmaceuticalRegistry();
         registry.setProduct(product);
@@ -117,7 +121,7 @@ public class RegistryServiceImpl implements RegistryService {
             unit.setSerialNumber(serialNumber);
 
             // Generate and save the unique item-level hash
-            unit.setQrHash(generateQrHash(serialNumber, product.getProductId().toString(), manufacturer.getParticipantId().toString()));
+            unit.setQrHash(qrCodeService.generateUnitQrHash(serialNumber, product.getProductId(), manufacturer.getParticipantId()));
 
             unit.setCurrentStatus("IN_BATCH");
             unitsToSave.add(unit);
@@ -157,18 +161,7 @@ public class RegistryServiceImpl implements RegistryService {
                 .orElseThrow(() -> new ResourceNotFoundException("Batch not found: " + batchNumber));
     }
 
-    private String generateQrHash(String batchNumber, String productId, String manufacturerId) {
-        try {
-            String input = batchNumber + "|" + productId + "|" + manufacturerId;
-            MessageDigest digest = MessageDigest.getInstance("SHA-256");
-            byte[] hash = digest.digest(input.getBytes(StandardCharsets.UTF_8));
-            StringBuilder sb = new StringBuilder();
-            for (byte b : hash) { sb.append(String.format("%02x", b)); }
-            return sb.toString();
-        } catch (Exception e) {
-            throw new RuntimeException("Failed to generate QR hash", e);
-        }
-    }
+
 
     private Map<String, Object> createBlockchainPayload(RegistryRequestDto request, ProductMaster product, SupplyChainParticipant manufacturer, int declaredUnits) {
         Map<String, Object> payload = new HashMap<>();
@@ -189,7 +182,11 @@ public class RegistryServiceImpl implements RegistryService {
         payload.put("manufacturerCountry", manufacturer.getCountry());
         payload.put("manufacturingDate", request.manufacturingDate() != null ? request.manufacturingDate().toString() : null);
         payload.put("expiryDate", request.expiryDate().toString());
-        payload.put("qrHash", generateQrHash(request.batchNumber(), product.getProductId().toString(), manufacturer.getParticipantId().toString()));
+        payload.put("qrHash", qrCodeService.generateBatchQrHash(
+                request.batchNumber(),
+                product.getProductId(),
+                manufacturer.getParticipantId()
+        ));
         return payload;
     }
 }

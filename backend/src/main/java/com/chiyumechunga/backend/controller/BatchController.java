@@ -18,6 +18,7 @@ import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
+import com.chiyumechunga.backend.service.QrCodeService;
 
 import java.io.ByteArrayOutputStream;
 import java.util.List;
@@ -31,11 +32,13 @@ public class BatchController {
     private final RegistryService registryService;
     private final ProvenanceService provenanceService;
     private final PharmaceuticalRegistryRepository registryRepository;
+    private final QrCodeService qrCodeService;
 
-    public BatchController(RegistryService registryService, ProvenanceService provenanceService, PharmaceuticalRegistryRepository registryRepository) {
+    public BatchController(RegistryService registryService, ProvenanceService provenanceService, PharmaceuticalRegistryRepository registryRepository, QrCodeService qrCodeService) {
         this.registryService = registryService;
         this.provenanceService = provenanceService;
         this.registryRepository = registryRepository;
+        this.qrCodeService = qrCodeService;
     }
 
     /**
@@ -97,31 +100,6 @@ public class BatchController {
      *
      * Only confirmed batches should expose downloadable/printable QR codes.
      */
-    @GetMapping(value = "/{batchNumber}/qrcode", produces = MediaType.IMAGE_PNG_VALUE)
-    public ResponseEntity<byte[]> getBatchQRCode(@PathVariable String batchNumber) {
-        PharmaceuticalRegistry batch = registryService.getBatchDetails(sanitizeStrict(batchNumber));
-
-        if (!"CONFIRMED".equals(batch.getCurrentStatus())) {
-            return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(null);
-        }
-
-        try {
-            QRCodeWriter qrCodeWriter = new QRCodeWriter();
-            BitMatrix bitMatrix = qrCodeWriter.encode(batch.getQrHash(), BarcodeFormat.QR_CODE, 300, 300);
-
-            ByteArrayOutputStream pngOutputStream = new ByteArrayOutputStream();
-            MatrixToImageWriter.writeToStream(bitMatrix, "PNG", pngOutputStream);
-
-            HttpHeaders headers = new HttpHeaders();
-            headers.add("X-Content-Type-Options", "nosniff");
-            headers.setContentType(MediaType.IMAGE_PNG);
-
-            return new ResponseEntity<>(pngOutputStream.toByteArray(), headers, HttpStatus.OK);
-        } catch (Exception e) {
-            log.error("ZXing QR generation failed for batchNumber={}", batchNumber, e);
-            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).build();
-        }
-    }
 
     /**
      * 5. LIST ALL BATCHES
@@ -145,6 +123,20 @@ public class BatchController {
         }
 
         return ResponseEntity.ok(registryOpt.get());
+    }
+
+    @GetMapping(value = "/{batchNumber}/qrcode", produces = MediaType.IMAGE_PNG_VALUE)
+    public ResponseEntity<byte[]> getBatchQRCode(@PathVariable String batchNumber) {
+        String safeBatchNumber = sanitizeStrict(batchNumber);
+
+        // No try-catch needed! ExceptionHandler handles 404s and 500s.
+        byte[] qrCode = qrCodeService.generateBatchQrCode(safeBatchNumber);
+
+        HttpHeaders headers = new HttpHeaders();
+        headers.add("X-Content-Type-Options", "nosniff");
+        headers.setContentType(MediaType.IMAGE_PNG);
+
+        return new ResponseEntity<>(qrCode, headers, HttpStatus.OK);
     }
 
     /**

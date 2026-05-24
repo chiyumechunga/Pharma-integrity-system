@@ -3,7 +3,7 @@ package com.chiyumechunga.backend.controller;
 import com.chiyumechunga.backend.dto.IncidentReportDto;
 import com.chiyumechunga.backend.dto.VerificationRequestDto;
 import com.chiyumechunga.backend.dto.VerificationResponseDto;
-import com.chiyumechunga.backend.service.QrCodeGeneratorService;
+import com.chiyumechunga.backend.service.QrCodeService;
 import com.chiyumechunga.backend.service.VerificationService;
 import jakarta.validation.Valid;
 import lombok.extern.slf4j.Slf4j;
@@ -23,11 +23,11 @@ import org.springframework.web.util.HtmlUtils;
 public class VerificationController {
 
     private final VerificationService verificationService;
-    private final QrCodeGeneratorService qrCodeGeneratorService;
+    private final QrCodeService qrCodeService;
 
-    public VerificationController(VerificationService verificationService, QrCodeGeneratorService qrCodeGeneratorService) {
+    public VerificationController(VerificationService verificationService, QrCodeService qrCodeService) {
         this.verificationService = verificationService;
-        this.qrCodeGeneratorService = qrCodeGeneratorService;
+        this.qrCodeService = qrCodeService;
     }
 
     @PostMapping
@@ -66,15 +66,12 @@ public class VerificationController {
 
     @GetMapping(value = "/generate-label/{qrHash}")
     public ResponseEntity<byte[]> generateBatchLabel(@PathVariable String qrHash) {
-        try {
-            byte[] image = qrCodeGeneratorService.generateQrCodeImage(qrHash);
-            HttpHeaders headers = new HttpHeaders();
-            headers.setContentType(MediaType.IMAGE_PNG);
-            return new ResponseEntity<>(image, headers, HttpStatus.OK);
-        } catch (Exception e) {
-            log.error("Failed to generate QR code for hash: {}", qrHash, e);
-            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).build();
-        }
+        // Calling the generic payload method for arbitrary hashes
+        byte[] image = qrCodeService.generateQrCodeImage(qrHash, 250, 250);
+
+        HttpHeaders headers = new HttpHeaders();
+        headers.setContentType(MediaType.IMAGE_PNG);
+        return new ResponseEntity<>(image, headers, HttpStatus.OK);
     }
 
     @PostMapping("/report")
