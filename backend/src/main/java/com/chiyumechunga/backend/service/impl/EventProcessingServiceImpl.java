@@ -5,14 +5,13 @@ import com.chiyumechunga.backend.dto.firefly.FireflyEventDto;
 import com.chiyumechunga.backend.model.*;
 import com.chiyumechunga.backend.repository.*;
 import com.chiyumechunga.backend.service.EventProcessingService;
+import com.chiyumechunga.backend.service.QrCodeService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-import java.nio.charset.StandardCharsets;
-import java.security.MessageDigest;
 import java.time.ZonedDateTime;
 import java.util.ArrayList;
 import java.util.List;
@@ -30,7 +29,8 @@ public class EventProcessingServiceImpl implements EventProcessingService {
     private final ChainOfCustodyRepository custodyRepo;
     private final EventCheckpointRepository checkpointRepo;
     private final FailedEventRepository failedEventRepo;
-    private final RegulatoryScrutinyRepository scrutinyRepo;
+    // scrutinyRepo removed since lab testing is handled off-chain via dedicated API controllers
+    private final QrCodeService qrCodeService;
 
     private String mapBlockchainStatus(String incomingStatus) {
         if (incomingStatus == null || "ON_CHAIN".equals(incomingStatus)) {
@@ -67,9 +67,7 @@ public class EventProcessingServiceImpl implements EventProcessingService {
                 case "CustodyTransferred":
                     handleCustodyTransferred(eventId, data, event);
                     break;
-                case "TestResultsSubmitted":
-                    handleTestResultsSubmitted(eventId, data, event);
-                    break;
+                // REMOVED TestResultsSubmitted as it is not implemented in the chaincode
                 default:
                     log.warn("Unknown blockchain event name: {}. Ignoring payload.", eventName);
             }
@@ -197,36 +195,6 @@ public class EventProcessingServiceImpl implements EventProcessingService {
         custodyRepo.save(custodyEvent);
     }
 
-    private void handleTestResultsSubmitted(UUID eventId, AssetData data, FireflyEventDto event) {
-        String qrHash = data.qrHash();
-
-        PharmaceuticalRegistry registry = registryRepo.findByQrHash(qrHash)
-                .orElseThrow(() -> new RuntimeException("Cannot log test results. Asset not found for QR: " + qrHash));
-
-        RegulatoryScrutiny scrutiny = new RegulatoryScrutiny();
-        scrutiny.setRegistry(registry);
-        scrutiny.setScrutinyDate(java.time.LocalDate.now());
-
-        try {
-            scrutiny.setTestResult(com.chiyumechunga.backend.model.TestResult.valueOf(data.currentStatus()));
-        } catch (IllegalArgumentException e) {
-            log.warn("Could not map blockchain status '{}' to TestResult Enum.", data.currentStatus());
-        }
-
-        if (event.transaction() != null) {
-            scrutiny.setBlockchainTxId(event.transaction().id());
-        } else {
-            scrutiny.setBlockchainTxId(data.txId() != null ? data.txId() : "UNKNOWN_TX");
-        }
-
-        scrutinyRepo.save(scrutiny);
-
-        registry.setCurrentStatus(data.currentStatus());
-        registryRepo.save(registry);
-
-        log.info("Successfully recorded Regulatory Scrutiny for QR {}. Status: {}", qrHash, data.currentStatus());
-    }
-
     private void saveCheckpoint(String eventId, String sequence) {
         EventCheckpoint checkpoint = new EventCheckpoint();
         checkpoint.setListenerId(eventId);
@@ -265,45 +233,30 @@ public class EventProcessingServiceImpl implements EventProcessingService {
 
             List<SerializedUnit> newUnits = new ArrayList<>();
 
+            // Extract IDs for the QrCodeService (Assumes typical JPA relation mapping based on your schema)
+            UUID productId = batch.getProduct() != null ? batch.getProduct().getProductId() : null;
+            UUID manufacturerId = batch.getManufacturer() != null ? batch.getManufacturer().getParticipantId() : null;
+
             for (int i = 1; i <= batch.getBatchUnitCount(); i++) {
                 SerializedUnit unit = new SerializedUnit();
-                unit.setRegistryId(batch.getRegistryId());
+
+                // Set the parent entity object to satisfy the foreign key constraint
+                unit.setBatch(batch);
 
                 // Generates format: BATCH-ARTN-2026-002-SN001
                 String serialNumber = String.format("%s-SN%03d", batch.getBatchNumber(), i);
                 unit.setSerialNumber(serialNumber);
                 unit.setCurrentStatus("IN_BATCH");
 
-                // Give each item a real, cryptographically secure hash
-                unit.setQrHash(generateSHA256Hash(serialNumber));
+                // Generate the cryptographic hash using the dedicated QrCodeService
+                String unitHash = qrCodeService.generateUnitQrHash(serialNumber, productId, manufacturerId);
+                unit.setQrHash(unitHash);
 
                 newUnits.add(unit);
             }
 
             unitRepo.saveAll(newUnits);
             log.info("Successfully populated all missing serialized units for Batch: {}", batch.getBatchNumber());
-        }
-    }
-
-    /**
-     * Helper method to generate realistic 64-character SHA-256 hashes for unit QR codes
-     */
-    private String generateSHA256Hash(String input) {
-        try {
-            MessageDigest digest = MessageDigest.getInstance("SHA-256");
-            byte[] hashBytes = digest.digest(input.getBytes(StandardCharsets.UTF_8));
-            StringBuilder hexString = new StringBuilder(2 * hashBytes.length);
-            for (byte b : hashBytes) {
-                String hex = Integer.toHexString(0xff & b);
-                if (hex.length() == 1) {
-                    hexString.append('0');
-                }
-                hexString.append(hex);
-            }
-            return hexString.toString();
-        } catch (Exception e) {
-            log.error("Failed to generate secure QR hash. Falling back to UUID.", e);
-            return UUID.randomUUID().toString().replace("-", "");
         }
     }
 }
