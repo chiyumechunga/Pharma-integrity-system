@@ -330,7 +330,7 @@ export default function PublicVerification() {
                                                 <p className={styles.participants}>Location: {toName}</p>
                                             )}
 
-                                            <p className={styles.eventTx}>TX: {event.blockchainTxId?.substring(0, 16)}...</p>
+                                            {/* <p className={styles.eventTx}>TX: {event.blockchainTxId?.substring(0, 16)}...</p> */}
                                         </div>
                                     </div>
                                 );
