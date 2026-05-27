@@ -40,6 +40,12 @@ export default function ManufacturerDashboard() {
         onSuccess: () => {
             queryClient.invalidateQueries(['myInventory']);
             setActiveTab('inventory');
+            alert("Success: Batch successfully minted and registered on the ledger.");
+        },
+        onError: (error) => {
+            // Extracts the error message from your ErrorResponseDto if available
+            const errorMessage = error.response?.data?.message || "An error occurred while minting the batch.";
+            alert(`Failed: ${errorMessage}`);
         }
     });
 
